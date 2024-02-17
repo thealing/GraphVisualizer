@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+		<title>Graph Visualizer</title>
+	<link rel="stylesheet" href="index.css">
+</head>
+<body>
+	<div id="header">
+		Graph Visualizer
+	</div>
+	<div id="toolbar">
+		<div id="input-container">
+		<label id="distance-label">Distance:</label>
+		<input id="distance-input" type="number" value="150" />
+		</div>
+		<textarea id="edge-list-edit" placeholder="Input graph..."></textarea>
+		<button id="refresh-button" onclick="onRefresh()">Refresh</button>
+	</div>
+	<div id="content">
+		<svg id="display-svg"></svg>
+	</div>
+	<script src="index.js"></script>
+</body>
+</html>
+

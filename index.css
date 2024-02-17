@@ -1,0 +1,121 @@
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+	border: none;
+	outline: none;
+	background: lightgray;
+	color: black;
+	font-family: Verdana, sans-serif;
+
+	--toolbar-width: 200px;
+	--header-height: 50px;
+	--control-height: 30px;
+	--toolbar-padding: 10px;
+	--content-padding: 10px;
+	--control-margin: 10px;
+}
+
+html {
+	height: 100%;
+}
+
+body {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	min-width: 400px;
+	min-height: 400px;
+}
+
+#header {
+	position: absolute;
+	width: 100%;
+	height: var(--header-height);
+	line-height: var(--header-height);
+	padding-left: 10px;
+	font-size: 30px;
+	border-bottom: solid 1px black;
+}
+
+#toolbar {
+	position: absolute;
+	width: var(--toolbar-width);
+	height: calc(100% - var(--header-height));
+	right: 0;
+	top: var(--header-height);
+	padding: var(--toolbar-padding);
+	background: lightgray;
+	border-left: solid 1px black;
+}
+
+#toolbar * {
+	position: absolute;
+	width: calc(100% - 2 * var(--toolbar-padding));
+	height: var(--control-height);
+	border: solid 1px black;
+}
+
+#toolbar #input-container {
+	height: calc(1 * var(--control-height));
+	display: grid;
+	grid-template-columns: 100px 100px;
+	border: none;
+}
+
+#toolbar #input-container label {
+	display: flex;
+	align-items: center;
+	border: none;
+}
+
+#toolbar #input-container * {
+	position: relative;
+}
+
+#toolbar textarea {
+	top: calc(var(--toolbar-padding) + 1 * (var(--control-height) + var(--control-margin)));
+	height: 200px;
+	min-height: 100px;
+	max-height: 500px;
+	padding: 5px;
+	resize: vertical;
+}
+
+#toolbar button:hover {
+	background: darkgray;
+}
+
+#toolbar button:active {
+	background: dimgray;
+}
+
+#toolbar #refresh-button {
+	bottom: calc(var(--toolbar-padding) + 0 * (var(--control-height) + var(--control-margin)));
+}
+
+#content {
+	position: absolute;
+	width: calc(100% - var(--toolbar-width));
+	height: calc(100% - var(--header-height));
+	top: var(--header-height);
+	padding: var(--content-padding);
+	background: lightgray;
+}
+
+#content * {
+	position: absolute;
+	padding: var(--content-padding);
+	border: solid 1px black;
+}
+
+#content svg {
+	padding: 10px;
+	width: calc(100% - 2 * var(--content-padding));
+	max-height: calc(100% - 2 * var(--content-padding));
+	aspect-ratio: 1 / 1;
+}
+
+text {
+	user-select: none;
+}
