@@ -1,5 +1,7 @@
 const distanceInput = document.getElementById("distance-input");
 
+const directedInput = document.getElementById("directed-input");
+
 const edgeListEdit = document.getElementById("edge-list-edit");
 
 const displaySvg = document.getElementById("display-svg");
@@ -31,6 +33,7 @@ function onRefresh() {
 	}
 	for (const [[a, b], e] of edges.entries()) {
 	 	e.svgElement.remove();
+		e.arrow.remove();
 	}
 	nodes = new Map();
 	edges = new Map();
@@ -40,7 +43,6 @@ function onRefresh() {
 		if (a == undefined || b == undefined) {
 			continue;
 		}
-		console.log(a,b);
 		addNode(a);
 		addNode(b);
 		addEdge(a, b);
@@ -58,6 +60,7 @@ function init() {
 
 function update() {
 		springDistance = distanceInput.value;
+		drawArrows = directedInput.checked;
 		for (const i in nodes) {
 			nodes[i].svgElement.setAttribute("transform", `translate(${nodes[i].p.x}, ${nodes[i].p.y})`);
 			nodes[i].a = new Vector();
@@ -71,6 +74,8 @@ function update() {
 			elem.setAttribute("y1", start.y);
 			elem.setAttribute("x2", end.x);
 			elem.setAttribute("y2", end.y);
+			e.arrow.setAttribute("transform", `translate(${end.x}, ${end.y}) rotate(${Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI - 90})`);
+			e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
 		}
 		for (const [[a, b], e] of edges.entries()) {
 			const d = nodes[b].p.sub(nodes[a].p);
@@ -162,6 +167,14 @@ function createSvgEdge() {
 	return line;
 }
 
+function createSvgArrow() {
+	const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+	arrow.setAttribute("fill", "black");
+	arrow.setAttribute("d", "M-7,-10 L0,0 L7,-10 Z");
+	displaySvg.appendChild(arrow);
+	return arrow;
+}
+
 function Node(x, y, i) {
 	this.p = new Vector(displayWidth / 2 + Math.random(), displayHeight / 2 + Math.random());
 	this.v = new Vector();
@@ -201,6 +214,7 @@ function Node(x, y, i) {
 
 function Edge() {
 	this.svgElement = createSvgEdge();
+	this.arrow = createSvgArrow();
 }
 
 class Vector {
