@@ -133,7 +133,7 @@ function addNode(i) {
 }
 
 function addEdge(a, b) {
-	edges.set([Math.min(a, b), Math.max(a, b)], new Edge());
+	edges.set([a, b], new Edge());
 }
 
 function createSvgNode(x, y, i) {
