@@ -9,7 +9,7 @@
 	accent-color: black;
 	font-family: Verdana, sans-serif;
 
-	--toolbar-width: 300px;
+	--toolbar-width: 250px;
 	--header-height: 50px;
 	--control-height: 30px;
 	--toolbar-padding: 10px;
@@ -60,7 +60,7 @@ body {
 #toolbar #input-container {
 	height: calc(2 * var(--control-height));
 	display: grid;
-	grid-template-columns: 200px 100px;
+	grid-template-columns: 150px 100px;
 	border: none;
 }
 
