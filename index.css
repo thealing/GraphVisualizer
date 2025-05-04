@@ -9,7 +9,7 @@
 	accent-color: black;
 	font-family: Verdana, sans-serif;
 
-	--toolbar-width: 200px;
+	--toolbar-width: 300px;
 	--header-height: 50px;
 	--control-height: 30px;
 	--toolbar-padding: 10px;
@@ -60,7 +60,7 @@ body {
 #toolbar #input-container {
 	height: calc(2 * var(--control-height));
 	display: grid;
-	grid-template-columns: 100px 100px;
+	grid-template-columns: 200px 100px;
 	border: none;
 }
 
@@ -74,13 +74,17 @@ body {
 	filter: brightness(82%);
 }
 
+#toolbar #input-container input[type="number"] {
+	padding-left: 5px;
+}
+
 #toolbar #input-container * {
 	position: relative;
 	margin-bottom: var(--control-margin);
 }
 
 #toolbar textarea {
-	top: calc(var(--toolbar-padding) + 2 * (var(--control-height) + var(--control-margin)));
+	top: calc(var(--toolbar-padding) + 3 * (var(--control-height) + var(--control-margin)));
 	height: 200px;
 	min-height: 100px;
 	max-height: 500px;

@@ -2,6 +2,8 @@ const distanceInput = document.getElementById("distance-input");
 
 const directedInput = document.getElementById("directed-input");
 
+const manualInput = document.getElementById("manual-input");
+
 const edgeListEdit = document.getElementById("edge-list-edit");
 
 const displaySvg = document.getElementById("display-svg");
@@ -61,6 +63,7 @@ function init() {
 function update() {
 		springDistance = distanceInput.value;
 		drawArrows = directedInput.checked;
+		manualMode = manualInput.checked;
 		for (const i in nodes) {
 			nodes[i].svgElement.setAttribute("transform", `translate(${nodes[i].p.x}, ${nodes[i].p.y})`);
 			nodes[i].a = new Vector();
@@ -76,6 +79,29 @@ function update() {
 			elem.setAttribute("y2", end.y);
 			e.arrow.setAttribute("transform", `translate(${end.x}, ${end.y}) rotate(${Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI - 90})`);
 			e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
+		}
+		if (manualMode) {
+			const minDistance = nodeRadius * 3;
+			for (const a in nodes) {
+				for (const b in nodes) {
+					if (b <= a) {
+						continue;
+					}
+					const d = nodes[b].p.sub(nodes[a].p);
+					const l = d.len();
+					if (l >= minDistance) {
+						continue;
+					}
+					const v = d.norm().mul(minDistance - l);
+					if (!nodes[a].dragging && !nodes[a].fixed) {
+						nodes[a].p = nodes[a].p.add(v.div(-2));
+					}
+					if (!nodes[b].dragging && !nodes[b].fixed) {
+						nodes[b].p = nodes[b].p.add(v.div(2));
+					}
+				}
+			}
+			return;
 		}
 		for (const [[a, b], e] of edges.entries()) {
 			const d = nodes[b].p.sub(nodes[a].p);
