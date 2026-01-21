@@ -29,16 +29,7 @@ function onGraphSvgResize(width, height) {
 	displayHeight = height;
 }
 
-function onRefresh() {
-	for (const i in nodes) {
-		nodes[i].svgElement.remove();
-	}
-	for (const [[a, b], e] of edges.entries()) {
-	 	e.svgElement.group.remove();
-		e.arrow.remove();
-	}
-	nodes = new Map();
-	edges = new Map();
+function onUpdate() {
 	const lines = edgeListEdit.value.trim().split('\n');
 	for (const line of lines) {
 		const [a, b, w] = line.trim().split(' ').map(Number);
@@ -49,6 +40,19 @@ function onRefresh() {
 		addNode(b);
 		addEdge(a, b, w);
 	}
+}
+
+function onRefresh() {
+	for (const i in nodes) {
+		nodes[i].svgElement.remove();
+	}
+	for (const [[a, b], e] of edges.entries()) {
+	 	e.svgElement.group.remove();
+		e.arrow.remove();
+	}
+	nodes = new Map();
+	edges = new Map();
+	onUpdate()
 }
 
 function onApply() {
@@ -78,7 +82,9 @@ function update() {
 		nodes[i].svgElement.setAttribute("transform", `translate(${nodes[i].p.x}, ${nodes[i].p.y})`);
 		setNodeRadius(nodes[i].svgElement, nodeRadius);
 	}
-	for (const [[a, b], e] of edges.entries()) {
+	for (const e of edges.values()) {
+		const a = e.a;
+		const b = e.b;
 		const elem = e.svgElement;
 		const v = nodes[b].p.sub(nodes[a].p);
 		if (v.len() <= nodeRadius * 2) {
@@ -144,7 +150,9 @@ function update() {
 		for (const i in nodes) {
 			nodes[i].a = new Vector();
 		}
-		for (const [[a, b], e] of edges.entries()) {
+		for (const e of edges.values()) {
+			const a = e.a;
+			const b = e.b;
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len();
 			if (l == 0) {
@@ -201,7 +209,14 @@ function addNode(i) {
 }
 
 function addEdge(a, b, w) {
-	edges.set([a, b], new Edge(w));
+	const k = a + "-" + b;
+	const e = edges.get(k);
+	if (e) {
+		e.weight = w;
+	}
+	else {
+		edges.set(k, new Edge(a, b, w));
+	}
 }
 
 function setNodeRadius(group, radius) {
@@ -296,7 +311,9 @@ function Node(x, y, i) {
 	});
 }
 
-function Edge(weight) {
+function Edge(a, b, weight) {
+	this.a = a;
+	this.b = b;
 	this.weight = weight;
 	this.svgElement = createSvgEdge();
 	this.arrow = createSvgArrow();
