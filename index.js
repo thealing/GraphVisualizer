@@ -30,6 +30,12 @@ function onGraphSvgResize(width, height) {
 }
 
 function onUpdate() {
+	for (const e of edges.values()) {
+	 	e.gen = 0;
+	}
+	for (const i in nodes) {
+		nodes[i].gen = 0;
+	}
 	const lines = edgeListEdit.value.trim().split('\n');
 	for (const line of lines) {
 		const [a, b, w] = line.trim().split(' ').map(Number);
@@ -40,13 +46,26 @@ function onUpdate() {
 		addNode(b);
 		addEdge(a, b, w);
 	}
+	for (const i in nodes) {
+		if (nodes[i].gen === 0) {
+			nodes[i].svgElement.remove();
+			delete nodes[i];
+		}
+	}
+	for (const [k, v] of edges.entries()) {
+	 	if (v.gen == 0) {
+	 		v.svgElement.group.remove();
+			v.arrow.remove();
+			edges.delete(k);
+		}
+	}
 }
 
 function onRefresh() {
 	for (const i in nodes) {
 		nodes[i].svgElement.remove();
 	}
-	for (const [[a, b], e] of edges.entries()) {
+	for (const e of edges.values()) {
 	 	e.svgElement.group.remove();
 		e.arrow.remove();
 	}
@@ -232,11 +251,11 @@ function update() {
 }
 
 function addNode(i) {
-	if (nodes[i]) {
-		return;
+	if (!nodes[i]) {
+		const m = displayWidth / 5;
+		nodes[i] = new Node(randomInt(m, displayWidth - m), randomInt(displayHeight / 4, displayHeight * 3 / 4), i);
 	}
-	const m = displayWidth / 5;
-	nodes[i] = new Node(randomInt(m, displayWidth - m), randomInt(displayHeight / 4, displayHeight * 3 / 4), i);
+	nodes[i].gen = 1;
 }
 
 function addEdge(a, b, w) {
@@ -244,6 +263,7 @@ function addEdge(a, b, w) {
 	const e = edges.get(k);
 	if (e) {
 		e.weight = w;
+		e.gen = 1;
 	}
 	else {
 		edges.set(k, new Edge(a, b, w));
@@ -347,6 +367,7 @@ function Edge(a, b, weight) {
 	this.a = a;
 	this.b = b;
 	this.weight = weight;
+	this.gen = 1;
 	this.svgElement = createSvgEdge();
 	this.arrow = createSvgArrow();
 }
