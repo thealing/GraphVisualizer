@@ -10,9 +10,7 @@
 		Graph Visualizer
 	</div>
 	<div id="toolbar">
-		<div id="input-container">
-			<label id="speed-label">Simulation speed:</label>
-			<input id="speed-input" type="number" value="2" />
+		<div class="input-container">
 			<label id="node-size-label">Node size:</label>
 			<input id="node-size-input" type="number" value="25" />
 			<label id="node-margin-label">Node margin:</label>
@@ -21,13 +19,20 @@
 			<input id="distance-input" type="number" value="150" />
 			<label id="directed-label">Directed edges:</label>
 			<input id="directed-input" type="checkbox" />
-			<label id="manual-label">Manual mode:</label>
-			<input id="manual-input" type="checkbox" />
+			<label id="weighted-label">Weighted edges:</label>
+			<input id="weighted-input" type="checkbox" />
 		</div>
 		<button id="apply-button" onclick="onApply()">Apply</button>
 		<div class="separator"></div>
 		<textarea id="edge-list-edit" placeholder="Edge list goes here"></textarea>
 		<button id="refresh-button" onclick="onRefresh()">Refresh</button>
+		<div class="separator"></div>
+		<div class="input-container narrow">
+			<label id="speed-label">Simulation speed:</label>
+			<input id="speed-input" type="number" value="2" />
+			<label id="manual-label">Manual mode:</label>
+			<input id="manual-input" type="checkbox" />
+		</div>
 	</div>
 	<div id="content">
 		<svg id="display-svg"></svg>

@@ -8,6 +8,8 @@ const distanceInput = document.getElementById("distance-input");
 
 const directedInput = document.getElementById("directed-input");
 
+const weightedInput = document.getElementById("weighted-input");
+
 const manualInput = document.getElementById("manual-input");
 
 const edgeListEdit = document.getElementById("edge-list-edit");
@@ -32,20 +34,20 @@ function onRefresh() {
 		nodes[i].svgElement.remove();
 	}
 	for (const [[a, b], e] of edges.entries()) {
-	 	e.svgElement.remove();
+	 	e.svgElement.group.remove();
 		e.arrow.remove();
 	}
 	nodes = new Map();
 	edges = new Map();
 	const lines = edgeListEdit.value.trim().split('\n');
 	for (const line of lines) {
-		const [a, b] = line.trim().split(' ').map(Number);
+		const [a, b, w] = line.trim().split(' ').map(Number);
 		if (a == undefined || b == undefined) {
 			continue;
 		}
 		addNode(a);
 		addNode(b);
-		addEdge(a, b);
+		addEdge(a, b, w);
 	}
 }
 
@@ -56,6 +58,7 @@ function onApply() {
 	springDistance = Number(distanceInput.value);
 	springDistance += nodeRadius * 2;
 	drawArrows = directedInput.checked;
+	weightedEdges = weightedInput.checked;
 	manualMode = manualInput.checked;
 }
 
@@ -79,19 +82,37 @@ function update() {
 		const elem = e.svgElement;
 		const v = nodes[b].p.sub(nodes[a].p);
 		if (v.len() <= nodeRadius * 2) {
-			elem.setAttribute("visibility", "hidden");
+			elem.group.setAttribute("visibility", "hidden");
 			e.arrow.setAttribute("visibility", "hidden");
 			continue;
 		}
-		elem.setAttribute("visibility", "visible");
+		elem.group.setAttribute("visibility", "visible");
 		const d = v.norm();
 		const start = nodes[a].p.add(d.mul(nodeRadius));
 		const end = nodes[b].p.sub(d.mul(nodeRadius));
 		const scale = Math.min(v.len() - nodeRadius * 2, nodeRadius) / 20
-		elem.setAttribute("x1", start.x);
-		elem.setAttribute("y1", start.y);
-		elem.setAttribute("x2", end.x);
-		elem.setAttribute("y2", end.y);
+		elem.line.setAttribute("x1", start.x);
+		elem.line.setAttribute("y1", start.y);
+		elem.line.setAttribute("x2", end.x);
+		elem.line.setAttribute("y2", end.y);
+		const x1 = start.x;
+		const y1 = start.y;
+		const x2 = end.x;
+		const y2 = end.y;
+		const mx = drawArrows ? (x1 + x2 * 2) / 3 : (x1 + x2) / 2;
+		const my = drawArrows ? (y1 + y2 * 2) / 3 : (y1 + y2) / 2;
+		const dx = x2 - x1;
+		const dy = y2 - y1;
+		const len = Math.hypot(dx, dy) || 1;
+		const nx = -dy / len;
+		const ny = dx / len;
+		const bbox = elem.text.getBBox();
+		const halfExtent = Math.abs(nx) * (bbox.width / 2) + Math.abs(ny) * (bbox.height / 2);
+		const offset = halfExtent + springDistance / 100;
+		elem.text.textContent = e.weight;
+		elem.text.setAttribute("font-size", nodeRadius / 2);
+		elem.text.setAttribute("x", mx - nx * offset);
+		elem.text.setAttribute("y", my - ny * offset);
 		e.arrow.setAttribute("transform", `translate(${end.x}, ${end.y}) rotate(${Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI - 90}) scale(${scale})`);
 		e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
 	}
@@ -179,8 +200,8 @@ function addNode(i) {
 	nodes[i] = new Node(displayWidth / 2, displayHeight / 2, i);
 }
 
-function addEdge(a, b) {
-	edges.set([a, b], new Edge());
+function addEdge(a, b, w) {
+	edges.set([a, b], new Edge(w));
 }
 
 function setNodeRadius(group, radius) {
@@ -214,11 +235,20 @@ function createSvgNode(x, y, i) {
 }
 
 function createSvgEdge() {
+	const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
 	const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
 	line.setAttribute("stroke", "black");
 	line.setAttribute("stroke-width", 1);
-	displaySvg.appendChild(line);
-	return line;
+	const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+	text.setAttribute("text-anchor", "middle");
+	text.setAttribute("fill", "black");
+	text.setAttribute("dy", "0.35em");
+	text.setAttribute("text-rendering", "geometricPrecision");
+	text.textContent = "0.0";
+	group.appendChild(line);
+	group.appendChild(text);
+	displaySvg.appendChild(group);
+	return { group, line, text };
 }
 
 function createSvgArrow() {
@@ -266,7 +296,8 @@ function Node(x, y, i) {
 	});
 }
 
-function Edge() {
+function Edge(weight) {
+	this.weight = weight;
 	this.svgElement = createSvgEdge();
 	this.arrow = createSvgArrow();
 }
