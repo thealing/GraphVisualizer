@@ -143,6 +143,7 @@ function update() {
 			continue;
 		}
 		elem.group.setAttribute("visibility", "visible");
+		elem.text.setAttribute("visibility", weightedEdges ? "visible" : "hidden");
 		const d = v.norm();
 		const start = nodes[a].p.add(d.mul(nodeRadius));
 		const end = nodes[b].p.sub(d.mul(nodeRadius));
