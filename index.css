@@ -9,7 +9,7 @@
 	accent-color: black;
 	font-family: Verdana, sans-serif;
 
-	--toolbar-width: 250px;
+	--toolbar-width: 280px;
 	--header-height: 50px;
 	--control-height: 30px;
 	--toolbar-padding: 10px;
@@ -51,20 +51,30 @@ body {
 }
 
 #toolbar * {
-	position: absolute;
-	width: calc(100% - 2 * var(--toolbar-padding));
-	height: var(--control-height);
+	position: relative;
 	border: solid 1px black;
+	margin-bottom: var(--control-margin);
+}
+
+#toolbar > * {
+	width: calc(var(--toolbar-width) - 2 * var(--toolbar-padding));
 }
 
 #toolbar #input-container {
-	height: calc(2 * var(--control-height));
 	display: grid;
-	grid-template-columns: 150px 100px;
+	grid-template-columns: 160px 100px;
 	border: none;
+	margin: 0;
+}
+
+#toolbar #input-container * {
+	height: var(--control-height);
+	padding-right: 5px;
+	margin-bottom: var(--control-margin);
 }
 
 #toolbar #input-container label {
+	padding-left: 5px;
 	display: flex;
 	align-items: center;
 	border: none;
@@ -78,18 +88,16 @@ body {
 	padding-left: 5px;
 }
 
-#toolbar #input-container * {
-	position: relative;
-	margin-bottom: var(--control-margin);
-}
-
 #toolbar textarea {
-	top: calc(var(--toolbar-padding) + 3 * (var(--control-height) + var(--control-margin)));
 	height: 200px;
 	min-height: 100px;
 	max-height: 500px;
 	padding: 5px;
 	resize: vertical;
+}
+
+#toolbar button {
+	height: var(--control-height);
 }
 
 #toolbar button:hover {
@@ -98,10 +106,6 @@ body {
 
 #toolbar button:active {
 	background: dimgray;
-}
-
-#toolbar #refresh-button {
-	bottom: calc(var(--toolbar-padding) + 0 * (var(--control-height) + var(--control-margin)));
 }
 
 #content {

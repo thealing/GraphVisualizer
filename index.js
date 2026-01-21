@@ -1,3 +1,9 @@
+const speedInput = document.getElementById("speed-input");
+
+const nodeSizeInput = document.getElementById("node-size-input");
+
+const nodeMarginInput = document.getElementById("node-margin-input");
+
 const distanceInput = document.getElementById("distance-input");
 
 const directedInput = document.getElementById("directed-input");
@@ -7,10 +13,6 @@ const manualInput = document.getElementById("manual-input");
 const edgeListEdit = document.getElementById("edge-list-edit");
 
 const displaySvg = document.getElementById("display-svg");
-
-var nodeRadius = 25;
-
-var nodeDistanceMin = nodeRadius * 3;
 
 var springDistance = 1;
 
@@ -57,51 +59,69 @@ function init() {
 			onGraphSvgResize(entry.contentRect.width, entry.contentRect.height);
 		}
 	}).observe(displaySvg);
-	setInterval(update, 5);
+	update();
 }
 
 function update() {
-		springDistance = distanceInput.value;
-		drawArrows = directedInput.checked;
-		manualMode = manualInput.checked;
-		for (const i in nodes) {
-			nodes[i].svgElement.setAttribute("transform", `translate(${nodes[i].p.x}, ${nodes[i].p.y})`);
-			nodes[i].a = new Vector();
+	requestAnimationFrame(update);
+	nodeRadius = Number(nodeSizeInput.value);
+	nodeDistanceMin = Number(nodeMarginInput.value);
+	nodeDistanceMin += nodeRadius * 2;
+	springDistance = Number(distanceInput.value);
+	springDistance += nodeRadius * 2;
+	drawArrows = directedInput.checked;
+	manualMode = manualInput.checked;
+	for (const i in nodes) {
+		nodes[i].svgElement.setAttribute("transform", `translate(${nodes[i].p.x}, ${nodes[i].p.y})`);
+		setNodeRadius(nodes[i].svgElement, nodeRadius);
+	}
+	for (const [[a, b], e] of edges.entries()) {
+		const elem = e.svgElement;
+		const v = nodes[b].p.sub(nodes[a].p);
+		if (v.len() <= nodeRadius * 2) {
+			elem.setAttribute("visibility", "hidden");
+			e.arrow.setAttribute("visibility", "hidden");
+			continue;
 		}
-		for (const [[a, b], e] of edges.entries()) {
-			const elem = e.svgElement;
-			const d = nodes[b].p.sub(nodes[a].p).norm();
-		 	const start = nodes[a].p.add(d.mul(nodeRadius));
-		 	const end = nodes[b].p.sub(d.mul(nodeRadius));
-			elem.setAttribute("x1", start.x);
-			elem.setAttribute("y1", start.y);
-			elem.setAttribute("x2", end.x);
-			elem.setAttribute("y2", end.y);
-			e.arrow.setAttribute("transform", `translate(${end.x}, ${end.y}) rotate(${Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI - 90})`);
-			e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
-		}
-		if (manualMode) {
-			const minDistance = nodeRadius * 3;
-			for (const a in nodes) {
-				for (const b in nodes) {
-					if (b <= a) {
-						continue;
-					}
-					const d = nodes[b].p.sub(nodes[a].p);
-					const l = d.len();
-					if (l >= minDistance) {
-						continue;
-					}
-					const v = d.norm().mul(minDistance - l);
-					if (!nodes[a].dragging && !nodes[a].fixed) {
-						nodes[a].p = nodes[a].p.add(v.div(-2));
-					}
-					if (!nodes[b].dragging && !nodes[b].fixed) {
-						nodes[b].p = nodes[b].p.add(v.div(2));
-					}
+		elem.setAttribute("visibility", "visible");
+		const d = v.norm();
+		const start = nodes[a].p.add(d.mul(nodeRadius));
+		const end = nodes[b].p.sub(d.mul(nodeRadius));
+		const scale = Math.min(v.len() - nodeRadius * 2, nodeRadius) / 20
+		elem.setAttribute("x1", start.x);
+		elem.setAttribute("y1", start.y);
+		elem.setAttribute("x2", end.x);
+		elem.setAttribute("y2", end.y);
+		e.arrow.setAttribute("transform", `translate(${end.x}, ${end.y}) rotate(${Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI - 90}) scale(${scale})`);
+		e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
+	}
+	const speed = speedInput.value;
+	if (manualMode || speed < 1) {
+		const minDistance = nodeDistanceMin;
+		for (const a in nodes) {
+			for (const b in nodes) {
+				if (b <= a) {
+					continue;
+				}
+				const d = nodes[b].p.sub(nodes[a].p);
+				const l = d.len();
+				if (l >= minDistance) {
+					continue;
+				}
+				const v = d.norm().mul(minDistance - l);
+				if (!nodes[a].dragging && !nodes[a].fixed) {
+					nodes[a].p = nodes[a].p.add(v.div(-2));
+				}
+				if (!nodes[b].dragging && !nodes[b].fixed) {
+					nodes[b].p = nodes[b].p.add(v.div(2));
 				}
 			}
-			return;
+		}
+		return;
+	}
+	for (let step = 0; step < speed; step++) {
+		for (const i in nodes) {
+			nodes[i].a = new Vector();
 		}
 		for (const [[a, b], e] of edges.entries()) {
 			const d = nodes[b].p.sub(nodes[a].p);
@@ -119,7 +139,7 @@ function update() {
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
 		for (const a in nodes) {
-		 	for (const b in nodes) {
+			for (const b in nodes) {
 				if (b <= a) {
 					continue;
 				}
@@ -149,6 +169,7 @@ function update() {
 				nodes[i].p = nodes[i].p.add(nodes[i].v);
 			}
 		}
+	}
 }
 
 function addNode(i) {
@@ -160,6 +181,13 @@ function addNode(i) {
 
 function addEdge(a, b) {
 	edges.set([a, b], new Edge());
+}
+
+function setNodeRadius(group, radius) {
+	const circle = group.querySelector("circle");
+	const text = group.querySelector("text");
+	circle?.setAttribute("r", radius);
+	text?.setAttribute("font-size", radius * 0.8);
 }
 
 function createSvgNode(x, y, i) {
@@ -177,7 +205,7 @@ function createSvgNode(x, y, i) {
 	text.setAttribute("cx", 0);
 	text.setAttribute("cy", 0);
 	text.setAttribute("text-anchor", "middle");
-	text.setAttribute("dominant-baseline", "middle");
+	text.setAttribute("dy", "0.35em");
 	text.setAttribute("fill", "black");
 	text.textContent = i;
 	group.appendChild(text);
