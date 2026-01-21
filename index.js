@@ -218,6 +218,10 @@ function update() {
 		for (const i in nodes) {
 			nodes[i].v = nodes[i].v.add(nodes[i].a);
 			nodes[i].v = nodes[i].v.mul(0.9);
+			const l = nodes[i].v.len();
+			if (l > nodeRadius / 2) {
+				nodes[i].v = nodes[i].v.mul(nodeRadius / 2 / l);
+			}
 		}
 		for (const i in nodes) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
@@ -231,7 +235,8 @@ function addNode(i) {
 	if (nodes[i]) {
 		return;
 	}
-	nodes[i] = new Node(displayWidth / 2, displayHeight / 2, i);
+	const m = displayWidth / 5;
+	nodes[i] = new Node(randomInt(m, displayWidth - m), randomInt(displayHeight / 4, displayHeight * 3 / 4), i);
 }
 
 function addEdge(a, b, w) {
@@ -301,7 +306,7 @@ function createSvgArrow() {
 }
 
 function Node(x, y, i) {
-	this.p = new Vector(displayWidth / 2 + Math.random(), displayHeight / 2 + Math.random());
+	this.p = new Vector(x, y);
 	this.v = new Vector();
 	this.a = new Vector();
 	this.fixed = false;
@@ -344,6 +349,10 @@ function Edge(a, b, weight) {
 	this.weight = weight;
 	this.svgElement = createSvgEdge();
 	this.arrow = createSvgArrow();
+}
+
+function randomInt(min, max) {
+	return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 class Vector {
