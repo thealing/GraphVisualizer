@@ -56,6 +56,15 @@ body {
 	margin-bottom: var(--control-margin);
 }
 
+#toolbar .separator {
+	border: none;
+	border-top: solid 1px black;
+	width: var(--toolbar-width);
+	height: 1px;
+	margin-left: calc(0px - var(--control-margin));
+	margin-right: calc(0px - var(--control-margin));
+}
+
 #toolbar > * {
 	width: calc(var(--toolbar-width) - 2 * var(--toolbar-padding));
 }
@@ -97,7 +106,7 @@ body {
 }
 
 #toolbar button {
-	height: var(--control-height);
+	height: calc(var(--control-height) * 1.1);
 }
 
 #toolbar button:hover {

@@ -14,10 +14,6 @@ const edgeListEdit = document.getElementById("edge-list-edit");
 
 const displaySvg = document.getElementById("display-svg");
 
-var springDistance = 1;
-
-var springStiffness = 0.01;
-
 var displayWidth = displaySvg.clientWidth;
 
 var displayHeight = displaySvg.clientHeight;
@@ -53,17 +49,7 @@ function onRefresh() {
 	}
 }
 
-function init() {
-	new ResizeObserver(function(entries) {
-		for (const entry of entries) {
-			onGraphSvgResize(entry.contentRect.width, entry.contentRect.height);
-		}
-	}).observe(displaySvg);
-	update();
-}
-
-function update() {
-	requestAnimationFrame(update);
+function onApply() {
 	nodeRadius = Number(nodeSizeInput.value);
 	nodeDistanceMin = Number(nodeMarginInput.value);
 	nodeDistanceMin += nodeRadius * 2;
@@ -71,6 +57,20 @@ function update() {
 	springDistance += nodeRadius * 2;
 	drawArrows = directedInput.checked;
 	manualMode = manualInput.checked;
+}
+
+function init() {
+	new ResizeObserver(function(entries) {
+		for (const entry of entries) {
+			onGraphSvgResize(entry.contentRect.width, entry.contentRect.height);
+		}
+	}).observe(displaySvg);
+	onApply();
+	update();
+}
+
+function update() {
+	requestAnimationFrame(update);
 	for (const i in nodes) {
 		nodes[i].svgElement.setAttribute("transform", `translate(${nodes[i].p.x}, ${nodes[i].p.y})`);
 		setNodeRadius(nodes[i].svgElement, nodeRadius);
