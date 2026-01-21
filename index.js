@@ -72,6 +72,32 @@ function init() {
 			onGraphSvgResize(entry.contentRect.width, entry.contentRect.height);
 		}
 	}).observe(displaySvg);
+	if (displaySvg) {
+		let dragging = false;
+		let lastX = 0;
+		let lastY = 0;
+		displaySvg.addEventListener("mousedown", (e) => {
+			dragging = true;
+			lastX = e.clientX;
+			lastY = e.clientY;
+		});
+		window.addEventListener("mousemove", (e) => {
+			if (!dragging) {
+				return;
+			}
+			const dx = e.clientX - lastX;
+			const dy = e.clientY - lastY;
+			lastX = e.clientX;
+			lastY = e.clientY;
+			for (const i in nodes) {
+				nodes[i].p.x += dx;
+				nodes[i].p.y += dy;
+			}
+		});
+		window.addEventListener("mouseup", () => {
+			dragging = false;
+		});
+	}
 	onApply();
 	update();
 }
@@ -286,6 +312,7 @@ function Node(x, y, i) {
 		this.dragging = true;
 		this.grabOffset = this.p.sub(new Vector(e.clientX, e.clientY));
 		document.body.style.cursor = "grabbing";
+		e.stopPropagation();
 	});
 	document.addEventListener("mouseup", e => {
 		if (this.dragging) {
