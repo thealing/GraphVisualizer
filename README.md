@@ -1,6 +1,9 @@
-This is a static website utility to visualize a graph given as an edge list.
-It is possible to orient the edges in case of a directed graph.
-Forces are applied such that the nodes will try to stay away from each other and close to the center.
-It is also possible to move the nodes around in manual mode.
+# Graph Visualizer
+
+This is an online simple graph visualizer. The graph can be specified by the edge list. Directed and weighted edges are also supported.
 
 Hosted at: https://elgv.netlify.app
+
+## Screenshots
+
+<img src="https://github.com/user-attachments/assets/577b36fc-2271-43ad-a6ce-2751e4b40940" />
