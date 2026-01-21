@@ -90,6 +90,10 @@ function init() {
 			onGraphSvgResize(entry.contentRect.width, entry.contentRect.height);
 		}
 	}).observe(displaySvg);
+	nodesLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+	edgesLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+	displaySvg.appendChild(nodesLayer);
+	displaySvg.appendChild(edgesLayer);
 	draggingBackground = false;
 	let lastX = 0;
 	let lastY = 0;
@@ -301,7 +305,7 @@ function createSvgNode(x, y, i) {
 	text.setAttribute("fill", "black");
 	text.textContent = i;
 	group.appendChild(text);
-	displaySvg.appendChild(group);
+	nodesLayer.appendChild(group);
 	return group;
 }
 
@@ -318,7 +322,7 @@ function createSvgEdge() {
 	text.textContent = "0.0";
 	group.appendChild(line);
 	group.appendChild(text);
-	displaySvg.appendChild(group);
+	edgesLayer.appendChild(group);
 	return { group, line, text };
 }
 
@@ -326,7 +330,7 @@ function createSvgArrow() {
 	const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
 	arrow.setAttribute("fill", "black");
 	arrow.setAttribute("d", "M-7,-10 L0,0 L7,-10 Z");
-	displaySvg.appendChild(arrow);
+	edgesLayer.appendChild(arrow);
 	return arrow;
 }
 
