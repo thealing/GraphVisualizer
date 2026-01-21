@@ -63,7 +63,6 @@ function onApply() {
 	springDistance += nodeRadius * 2;
 	drawArrows = directedInput.checked;
 	weightedEdges = weightedInput.checked;
-	manualMode = manualInput.checked;
 }
 
 function init() {
@@ -149,6 +148,7 @@ function update() {
 		e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
 	}
 	const speed = speedInput.value;
+	const manualMode = manualInput.checked;
 	if (manualMode || speed < 1) {
 		const minDistance = nodeDistanceMin;
 		for (const a in nodes) {
