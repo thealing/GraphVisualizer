@@ -40,12 +40,13 @@ body {
 }
 
 #toolbar {
-	position: absolute;
+	position: relative;
 	width: var(--toolbar-width);
-	height: calc(100% - var(--header-height));
-	right: 0;
+	min-height: calc(100% - var(--header-height));
+	display: float;
 	top: var(--header-height);
 	padding: var(--toolbar-padding);
+	margin-left: calc(100% - var(--toolbar-width) - 1px);
 	background: lightgray;
 	border-left: solid 1px black;
 }
@@ -69,38 +70,45 @@ body {
 	width: calc(var(--toolbar-width) - 2 * var(--toolbar-padding));
 }
 
-#toolbar #input-container {
+#toolbar .input-container {
 	display: grid;
 	grid-template-columns: 160px 100px;
 	border: none;
 	margin: 0;
 }
 
-#toolbar #input-container * {
+#toolbar .narrow {
+	display: grid;
+	grid-template-columns: 190px 70px;
+	border: none;
+	margin: 0;
+}
+
+#toolbar .input-container * {
 	height: var(--control-height);
 	padding-right: 5px;
 	margin-bottom: var(--control-margin);
 }
 
-#toolbar #input-container label {
+#toolbar .input-container label {
 	padding-left: 5px;
 	display: flex;
 	align-items: center;
 	border: none;
 }
 
-#toolbar #input-container input[type="checkbox"] {
+#toolbar .input-container input[type="checkbox"] {
 	filter: brightness(82%);
 }
 
-#toolbar #input-container input[type="number"] {
+#toolbar .input-container input[type="number"] {
 	padding-left: 5px;
 }
 
 #toolbar textarea {
 	height: 200px;
 	min-height: 100px;
-	max-height: 500px;
+	max-height: 700px;
 	padding: 5px;
 	resize: vertical;
 }
@@ -119,7 +127,7 @@ body {
 
 #content {
 	position: absolute;
-	width: calc(100% - var(--toolbar-width));
+	width: calc(100% - var(--toolbar-width) - 1px);
 	height: calc(100% - var(--header-height));
 	top: var(--header-height);
 	padding: var(--content-padding);
