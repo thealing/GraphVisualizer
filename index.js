@@ -90,32 +90,34 @@ function init() {
 			onGraphSvgResize(entry.contentRect.width, entry.contentRect.height);
 		}
 	}).observe(displaySvg);
-	if (displaySvg) {
-		let dragging = false;
-		let lastX = 0;
-		let lastY = 0;
-		displaySvg.addEventListener("mousedown", (e) => {
-			dragging = true;
-			lastX = e.clientX;
-			lastY = e.clientY;
-		});
-		window.addEventListener("mousemove", (e) => {
-			if (!dragging) {
-				return;
-			}
-			const dx = e.clientX - lastX;
-			const dy = e.clientY - lastY;
-			lastX = e.clientX;
-			lastY = e.clientY;
-			for (const i in nodes) {
-				nodes[i].p.x += dx;
-				nodes[i].p.y += dy;
-			}
-		});
-		window.addEventListener("mouseup", () => {
-			dragging = false;
-		});
-	}
+	draggingBackground = false;
+	let lastX = 0;
+	let lastY = 0;
+	displaySvg.addEventListener("mousedown", (e) => {
+		if (e.button != 0) {
+			return;
+		}
+		draggingBackground = true;
+		lastX = e.clientX;
+		lastY = e.clientY;
+		e.stopPropagation();
+	});
+	window.addEventListener("mousemove", (e) => {
+		if (!draggingBackground) {
+			return;
+		}
+		const dx = e.clientX - lastX;
+		const dy = e.clientY - lastY;
+		lastX = e.clientX;
+		lastY = e.clientY;
+		for (const i in nodes) {
+			nodes[i].p.x += dx;
+			nodes[i].p.y += dy;
+		}
+	});
+	window.addEventListener("mouseup", () => {
+		draggingBackground = false;
+	});
 	onApply();
 	update();
 }
@@ -165,6 +167,9 @@ function update() {
 		elem.text.setAttribute("y", my - ny * offset);
 		e.arrow.setAttribute("transform", `translate(${end.x}, ${end.y}) rotate(${Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI - 90}) scale(${scale})`);
 		e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
+	}
+	if (draggingBackground) {
+		return;
 	}
 	const speed = speedInput.value;
 	const manualMode = manualInput.checked;
@@ -252,8 +257,8 @@ function update() {
 
 function addNode(i) {
 	if (!nodes[i]) {
-		const m = displayWidth / 5;
-		nodes[i] = new Node(randomInt(m, displayWidth - m), randomInt(displayHeight / 4, displayHeight * 3 / 4), i);
+		const m = displayWidth / 3;
+		nodes[i] = new Node(randomInt(m, displayWidth - m), randomInt(displayHeight / 3, displayHeight * 2 / 3), i);
 	}
 	nodes[i].gen = 1;
 }
