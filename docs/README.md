@@ -43,6 +43,6 @@ To generate a graph, enter node pairs into the edge list editor. Weights are opt
 
 Use the "Update" button to apply changes to the current graph or "Refresh" to restart the simulation.
 
-## Screenshot
+## Screenshots
 
 <img src="screenshot.png" alt="Graph Visualizer Screenshot" />
