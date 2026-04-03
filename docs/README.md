@@ -1,6 +1,6 @@
 # Graph Visualizer
 
-Graph Visualizer is an interactive, web-based tool designed for the visualization and manipulation of mathematical graphs. It employs a physics-based simulation to provide dynamic layouts, allowing users to intuitively explore graph structures through an edge list input.
+An interactive, web-based tool designed for the visualization and manipulation of mathematical graphs. It employs a physics-based simulation to provide dynamic layouts, allowing users to intuitively explore graph structures through an edge list input.
 
 Hosted at: https://elgv.netlify.app
 
@@ -13,7 +13,7 @@ Hosted at: https://elgv.netlify.app
 *   **Dynamic Customization**: Adjust visualization parameters on the fly, including node sizing, margins, and edge lengths.
 *   **SVG Rendering**: High-quality, scalable graphics that remain sharp at any zoom level.
 
-## Configuration Options
+## Configuration
 
 The tool provides several parameters to fine-tune the visualization:
 
@@ -22,17 +22,28 @@ The tool provides several parameters to fine-tune the visualization:
 *   **Edge Length**: Control the target distance for the spring-based connections between nodes.
 *   **Directed Edges**: Toggle arrowheads to indicate the direction of flow.
 *   **Weighted Edges**: Enable numeric displays on edges to represent weights or costs.
-*   **Simulation Speed**: Scale the speed of the layout engine or switch to manual mode for static positioning.
+*   **Simulation Speed**: Scale the speed of the layout engine to control how quickly the graph settles.
+*   **Manual Mode**: Disable the physics engine to allow for static positioning and manual node placement.
 
 ## Usage
 
-To generate a graph, enter node pairs into the edge list editor using the following format:
+To generate a graph, enter node pairs into the edge list editor. Weights are optional and will only be displayed if the "Weighted Edges" option is enabled.
 
+- For unweighted graphs, enter node pairs separated by a space:
 ```
-[Node A] [Node B] [Weight]
+1 2
+2 3
+3 1
 ```
 
-Each line represents an edge. If weights are enabled, the third value will be displayed on the connection. Use the "Update" button to apply changes to the current graph or "Refresh" to clear the workspace and start anew.
+- For weighted graphs, enter node pairs followed by a weight:
+```
+1 2 5
+2 3 10
+3 1 2.5
+```
+
+Use the "Update" button to apply changes to the current graph or "Refresh" to restart the simulation.
 
 ## Screenshot
 
