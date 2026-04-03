@@ -1,6 +1,6 @@
 # Graph Visualizer
 
-An interactive, web-based tool designed for the visualization and manipulation of mathematical graphs. It employs a physics-based simulation to provide dynamic layouts, allowing users to intuitively explore graph structures through an edge list input.
+An interactive tool for the visualization of mathematical graphs.
 
 Hosted at: https://elgv.netlify.app
 
@@ -15,12 +15,10 @@ Hosted at: https://elgv.netlify.app
 
 ## Configuration
 
-The tool provides several parameters to fine-tune the visualization:
-
 *   **Node Size**: Adjust the radius of the graph nodes.
 *   **Node Margin**: Set the minimum spacing between nodes to prevent overlapping.
 *   **Edge Length**: Control the target distance for the spring-based connections between nodes.
-*   **Directed Edges**: Toggle arrowheads to indicate the direction of flow.
+*   **Directed Edges**: Toggle arrowheads to indicate the direction of the edges.
 *   **Weighted Edges**: Enable numeric displays on edges to represent weights or costs.
 *   **Simulation Speed**: Scale the speed of the layout engine to control how quickly the graph settles.
 *   **Manual Mode**: Disable the physics engine to allow for static positioning and manual node placement.
