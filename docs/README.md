@@ -6,8 +6,8 @@ Hosted at: https://elgv.netlify.app
 
 ## Features
 
-*   **Interactive Physics Simulation**: Nodes respond to spring and repulsion forces, creating organic layouts automatically.
-*   **Directed and Weighted Edges**: Support for directed graphs with arrows and weighted edges with numeric labels.
+*   **Force-Directed Layout**: Nodes respond to spring and repulsion forces, creating organic layouts automatically.
+*   **Graph Theory Support:**: Support for directed graphs with arrows and weighted edges with numeric labels.
 *   **Real-time Interaction**: Drag individual nodes to rearrange the layout or pan the entire view to navigate large graphs.
 *   **Dynamic Customization**: Adjust visualization parameters on the fly, including node sizing, margins, and edge lengths.
 *   **SVG Rendering**: High-quality, scalable graphics that remain sharp at any zoom level.
