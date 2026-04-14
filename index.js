@@ -300,7 +300,6 @@ function update() {
 			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e1 = edgeArray[i];
 				const e2 = edgeArray[j];
-				if (e1.a === e2.a || e1.a === e2.b || e1.b === e2.a || e1.b === e2.b) continue;
 				const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
 				const d = cp.pB.sub(cp.pA);
 				let l = d.len();
