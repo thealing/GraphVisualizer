@@ -132,6 +132,24 @@ function init() {
 		draggingBackground = false;
 	});
 	onApply();
+  edgeListEdit.value = "";
+  edgeListEdit.value += "0 4 2\n";
+  edgeListEdit.value += "0 1 4\n";
+  edgeListEdit.value += "9 8 2\n";
+  edgeListEdit.value += "8 9 1\n";
+  edgeListEdit.value += "6 9 7\n";
+  edgeListEdit.value += "6 7 2\n";
+  edgeListEdit.value += "3 7 5\n";
+  edgeListEdit.value += "2 3 3\n";
+  edgeListEdit.value += "2 6 6\n";
+  edgeListEdit.value += "1 2 7\n";
+  edgeListEdit.value += "1 5 9\n";
+  edgeListEdit.value += "5 8 4\n";
+  edgeListEdit.value += "5 6 8\n";
+  edgeListEdit.value += "5 1 7\n";
+  edgeListEdit.value += "4 8 3\n";
+  edgeListEdit.value += "4 5 1\n";
+  onUpdate();
 	update();
 }
 
@@ -195,7 +213,7 @@ function update() {
 		elem.text.setAttribute("font-size", nodeRadius / 2);
 		elem.text.setAttribute("x", mx - nx * offset);
 		elem.text.setAttribute("y", my - ny * offset);
-		elem.line.setAttribute("stroke-width", nodeRadius / 25);
+		elem.line.setAttribute("stroke-width", Math.min(nodeRadius / 25, scale * 3.5));
 		e.arrow.setAttribute("transform", `translate(${end.x}, ${end.y}) rotate(${Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI - 90}) scale(${scale})`);
 		e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
 	}
@@ -347,7 +365,7 @@ function createSvgEdge() {
 	text.setAttribute("fill", "black");
 	text.setAttribute("dy", "0.35em");
 	text.setAttribute("text-rendering", "geometricPrecision");
-	text.textContent = "0.0";
+	text.textContent = "0.0\n";
 	group.appendChild(line);
 	group.appendChild(text);
 	edgesLayer.appendChild(group);
@@ -373,29 +391,29 @@ function Node(x, y, i) {
 	this.svgElement.addEventListener("mousedown", e => {
 		this.dragging = true;
 		this.grabOffset = this.p.sub(new Vector(e.clientX, e.clientY));
-		document.body.style.cursor = "grabbing";
+		document.body.style.cursor = "grabbing\n";
 		e.stopPropagation();
 	});
 	document.addEventListener("mouseup", e => {
 		if (this.dragging) {
 			this.dragging = false;
-			document.body.style.cursor = "grab";
+			document.body.style.cursor = "grab\n";
 		}
 	});
  	document.addEventListener("mousemove", e => {
 		if (this.dragging) {
-			document.body.style.cursor = "grabbing";
+			document.body.style.cursor = "grabbing\n";
 			this.p = new Vector(e.clientX, e.clientY).add(this.grabOffset);
 		}
 	});
 	this.svgElement.addEventListener("mouseenter", e => {
 		if (!this.dragging) {
-			document.body.style.cursor = "grab";
+			document.body.style.cursor = "grab\n";
 		}
 	});
 	this.svgElement.addEventListener("mouseleave", e => {
 		if (!this.dragging) {
-			document.body.style.cursor = "default";
+			document.body.style.cursor = "default\n";
 		}
 	});
 }
