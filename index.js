@@ -262,9 +262,12 @@ function update() {
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len();
 			if (l > springDistance) {
-				const force = d.mul((l - springDistance) / (l * 100));
-				nodes[a].a = nodes[a].a.add(force);
-				nodes[b].a = nodes[b].a.add(force.neg());
+				const rv = nodes[b].v.sub(nodes[a].v);
+        const uD = d.div(l);
+        const damping = uD.mul(rv.dot(uD) * 0.05);
+        const force = d.mul((springDistance / l - 1) * 0.003).sub(damping);
+        nodes[a].a = nodes[a].a.add(force.neg());
+        nodes[b].a = nodes[b].a.add(force);
 			}
 		}
 		for (const i in nodes) {
@@ -283,10 +286,11 @@ function update() {
 				const minD = nodeDistanceMin;
 				if (l < minD && l > 0) {
 					const v = d.mul((minD - l) / l).mul(0.5);
-					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) nodes[e1.a].p = nodes[e1.a].p.sub(v.mul(1 - cp.s));
-					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) nodes[e1.b].p = nodes[e1.b].p.sub(v.mul(cp.s));
-					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) nodes[e2.a].p = nodes[e2.a].p.add(v.mul(1 - cp.t));
-					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) nodes[e2.b].p = nodes[e2.b].p.add(v.mul(cp.t));
+          const sd = 0.1;
+					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) nodes[e1.a].v = nodes[e1.a].v.sub(v.mul(1 - cp.s).mul(sd));
+					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) nodes[e1.b].v = nodes[e1.b].v.sub(v.mul(cp.s).mul(sd));
+					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) nodes[e2.a].v = nodes[e2.a].v.add(v.mul(1 - cp.t).mul(sd));
+					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) nodes[e2.b].v = nodes[e2.b].v.add(v.mul(cp.t).mul(sd));
 				}
 			}
 		}
@@ -304,7 +308,7 @@ function update() {
 		}
 		for (const i in nodes) {
 			nodes[i].v = nodes[i].v.add(nodes[i].a);
-			nodes[i].v = nodes[i].v.mul((0.9));
+			nodes[i].v = nodes[i].v.mul(0.95);
 			const l = nodes[i].v.len();
 			const limit = nodeRadius * 0.7;
 			if (l > limit) {
