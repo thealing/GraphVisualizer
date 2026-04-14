@@ -181,7 +181,7 @@ function update() {
 		const y1 = start.y;
 		const x2 = end.x;
 		const y2 = end.y;
-		const scale = Math.min(v.len() - nodeRadius * 2, nodeRadius) / 20;
+		const scale = Math.min((v.len() - nodeRadius * 2) * 5 / 6, nodeRadius) / 20;
 		const dx = x2 - x1;
 		const dy = y2 - y1;
 		const bbox = elem.text.getBBox();
