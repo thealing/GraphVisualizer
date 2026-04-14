@@ -9,34 +9,37 @@
 	<div id="header">
 		Graph Visualizer
 	</div>
-	<div id="toolbar">
-		<div class="input-container">
-			<label id="node-size-label">Node size:</label>
-			<input id="node-size-input" type="number" value="25" />
-			<label id="node-margin-label">Node margin:</label>
-			<input id="node-margin-input" type="number" value="20" />
-			<label id="distance-label">Edge length:</label>
-			<input id="distance-input" type="number" value="150" />
-			<label id="directed-label">Directed edges:</label>
-			<input id="directed-input" type="checkbox" />
-			<label id="weighted-label">Weighted edges:</label>
-			<input id="weighted-input" type="checkbox" />
+	<div id="layout">
+		<div id="content">
+			<svg id="display-svg"></svg>
 		</div>
-		<button onclick="onApply()">Apply</button>
-		<div class="separator"></div>
-		<textarea id="edge-list-edit" placeholder="Edge list goes here"></textarea>
-		<button onclick="onUpdate()">Update</button>
-		<button onclick="onRefresh()">Refresh</button>
-		<div class="separator"></div>
-		<div class="input-container narrow">
-			<label id="speed-label">Simulation speed:</label>
-			<input id="speed-input" type="number" value="1" />
-			<label id="manual-label">Manual mode:</label>
-			<input id="manual-input" type="checkbox" />
+		<div id="toolbar-container">
+			<div id="toolbar">
+				<div class="input-container">
+					<label id="node-size-label">Node Size</label>
+					<input id="node-size-input" type="number" value="25" />
+					<label id="node-margin-label">Node Margin</label>
+					<input id="node-margin-input" type="number" value="20" />
+					<label id="distance-label">Edge Length</label>
+					<input id="distance-input" type="number" value="100" />
+					<label id="directed-label">Directed Edges</label>
+					<input id="directed-input" type="checkbox" checked="true" />
+					<label id="weighted-label">Weighted Edges</label>
+					<input id="weighted-input" type="checkbox" checked="true" />
+				</div>
+				<div class="separator"></div>
+				<textarea id="edge-list-edit" placeholder="Edge list goes here"></textarea>
+				<button onclick="onUpdate()">Update</button>
+				<button onclick="onRefresh()">Refresh</button>
+				<div class="separator"></div>
+				<div class="input-container">
+					<label id="speed-label">Simulation Speed</label>
+					<input id="speed-input" type="number" value="1" />
+					<label id="manual-label">Manual Mode</label>
+					<input id="manual-input" type="checkbox" />
+				</div>
+			</div>
 		</div>
-	</div>
-	<div id="content">
-		<svg id="display-svg"></svg>
 	</div>
 	<script src="index.js"></script>
 </body>

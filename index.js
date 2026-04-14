@@ -80,8 +80,6 @@ function onApply() {
 	nodeDistanceMin += nodeRadius * 2;
 	springDistance = Number(distanceInput.value);
 	springDistance += nodeRadius * 2;
-	drawArrows = directedInput.checked;
-	weightedEdges = weightedInput.checked;
 }
 
 function init() {
@@ -90,6 +88,17 @@ function init() {
 			onGraphSvgResize(entry.contentRect.width, entry.contentRect.height);
 		}
 	}).observe(displaySvg);
+	const numericInputs = document.querySelectorAll('#toolbar input[type="number"]');
+	numericInputs.forEach(input => {
+		input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				onApply();
+			}
+		});
+		input.addEventListener('change', () => {
+			onApply();
+		});
+	});
 	nodesLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
 	edgesLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
 	displaySvg.appendChild(nodesLayer);
@@ -127,6 +136,8 @@ function init() {
 }
 
 function update() {
+	drawArrows = directedInput.checked;
+	weightedEdges = weightedInput.checked;
 	requestAnimationFrame(update);
 	for (const i in nodes) {
 		nodes[i].svgElement.setAttribute("transform", `translate(${nodes[i].p.x}, ${nodes[i].p.y})`);
@@ -140,6 +151,7 @@ function update() {
 		if (v.len() <= nodeRadius * 2) {
 			elem.group.setAttribute("visibility", "hidden");
 			e.arrow.setAttribute("visibility", "hidden");
+			elem.text.setAttribute("visibility", "hidden");
 			continue;
 		}
 		elem.group.setAttribute("visibility", "visible");
@@ -147,29 +159,47 @@ function update() {
 		const d = v.norm();
 		const start = nodes[a].p.add(d.mul(nodeRadius));
 		const end = nodes[b].p.sub(d.mul(nodeRadius));
-		const scale = Math.min(v.len() - nodeRadius * 2, nodeRadius) / 20
-		elem.line.setAttribute("x1", start.x);
-		elem.line.setAttribute("y1", start.y);
-		elem.line.setAttribute("x2", end.x);
-		elem.line.setAttribute("y2", end.y);
 		const x1 = start.x;
 		const y1 = start.y;
 		const x2 = end.x;
 		const y2 = end.y;
-		const mx = drawArrows ? (x1 + x2 * 2) / 3 : (x1 + x2) / 2;
-		const my = drawArrows ? (y1 + y2 * 2) / 3 : (y1 + y2) / 2;
+		const lineLen = v.len() - nodeRadius * 2;
+		const scale = Math.min(v.len() - nodeRadius * 2, nodeRadius) / 20;
+    const arrowZone = (10 * scale) + 2;
+
+    // 3. Target the 2/3 position, but clamp it
+    // We want the text at 0.66, but it must be at most (lineLen - arrowZone) 
+    // away from the start point.
+    const targetDist = drawArrows ? lineLen * (2/3) : lineLen * 0.5;
+    const safeDist = Math.min(targetDist, lineLen - arrowZone);
+
+    // 4. Calculate the new mx, my based on the safe distance
+    const lerp = safeDist / lineLen;
 		const dx = x2 - x1;
 		const dy = y2 - y1;
+    const mx = x1 + dx * lerp;
+    const my = y1 + dy * lerp;
 		const len = Math.hypot(dx, dy) || 1;
 		const nx = -dy / len;
 		const ny = dx / len;
 		const bbox = elem.text.getBBox();
 		const halfExtent = Math.abs(nx) * (bbox.width / 2) + Math.abs(ny) * (bbox.height / 2);
 		const offset = halfExtent + springDistance / 100;
+		elem.line.setAttribute("x1", start.x);
+		elem.line.setAttribute("y1", start.y);
+		if (drawArrows) {
+			elem.line.setAttribute("x2", end.x - ny * scale * 7);
+			elem.line.setAttribute("y2", end.y + nx * scale * 7);
+		}
+		else {
+			elem.line.setAttribute("x2", end.x);
+			elem.line.setAttribute("y2", end.y);
+		}
 		elem.text.textContent = e.weight;
 		elem.text.setAttribute("font-size", nodeRadius / 2);
 		elem.text.setAttribute("x", mx - nx * offset);
 		elem.text.setAttribute("y", my - ny * offset);
+		elem.line.setAttribute("stroke-width", nodeRadius / 25);
 		e.arrow.setAttribute("transform", `translate(${end.x}, ${end.y}) rotate(${Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI - 90}) scale(${scale})`);
 		e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
 	}
@@ -283,8 +313,9 @@ function addEdge(a, b, w) {
 function setNodeRadius(group, radius) {
 	const circle = group.querySelector("circle");
 	const text = group.querySelector("text");
-	circle?.setAttribute("r", radius);
-	text?.setAttribute("font-size", radius * 0.8);
+	circle.setAttribute("r", radius);
+	circle.setAttribute("stroke-width", radius / 25);
+	text.setAttribute("font-size", radius * 0.8);
 }
 
 function createSvgNode(x, y, i) {

@@ -2,72 +2,82 @@
 	box-sizing: border-box;
 	margin: 0;
 	padding: 0;
+	min-width: 0;
+	min-height: 0;
 	border: none;
 	outline: none;
 	background: lightgray;
 	color: black;
 	accent-color: black;
-	font-family: Verdana, sans-serif;
+	font-family: system-ui;
 
 	--toolbar-width: 280px;
 	--header-height: 50px;
-	--control-height: 30px;
+	--control-height: 31px;
 	--toolbar-padding: 10px;
 	--content-padding: 10px;
 	--control-margin: 10px;
 }
 
-html {
-	height: 100%;
+html, body {
+	width: 100vw;
+	width: 100dvw;
+	height: 100vh;
+	height: 100dvh;
+	overflow: hidden;
 }
 
 body {
-	position: relative;
-	width: 100%;
-	height: 100%;
-	min-width: 400px;
-	min-height: 400px;
+	display: flex;
+	flex-direction: column;
 }
 
 #header {
-	position: absolute;
 	width: 100%;
 	height: var(--header-height);
 	line-height: var(--header-height);
 	padding-left: 10px;
 	font-size: 30px;
 	border-bottom: solid 1px black;
+	font-family: Verdana;
+}
+
+#layout {
+	display: flex;
+	flex: 1;
+}
+
+#toolbar-container {
+	right: 0;
+	bottom: 0;
+	padding-top: var(--toolbar-padding);
+	background: lightgray;
+	overflow-y: auto;
+	overflow-x: hidden;
 }
 
 #toolbar {
 	position: relative;
-	width: var(--toolbar-width);
-	min-height: calc(100% - var(--header-height));
-	display: float;
-	top: var(--header-height);
-	padding: var(--toolbar-padding);
-	margin-left: calc(100% - var(--toolbar-width) - 1px);
-	background: lightgray;
-	border-left: solid 1px black;
+	width: 100%;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
 }
 
 #toolbar * {
-	position: relative;
 	border: solid 1px black;
 	margin-bottom: var(--control-margin);
+	margin-left: var(--control-margin);
+	margin-right: var(--control-margin);
+	font-size: 16px;
 }
 
 #toolbar .separator {
 	border: none;
 	border-top: solid 1px black;
-	width: var(--toolbar-width);
 	height: 1px;
 	margin-left: calc(0px - var(--control-margin));
 	margin-right: calc(0px - var(--control-margin));
-}
-
-#toolbar > * {
-	width: calc(var(--toolbar-width) - 2 * var(--toolbar-padding));
 }
 
 #toolbar .input-container {
@@ -85,7 +95,6 @@ body {
 }
 
 #toolbar .input-container * {
-	height: var(--control-height);
 	padding-right: 5px;
 	margin-bottom: var(--control-margin);
 }
@@ -95,6 +104,7 @@ body {
 	display: flex;
 	align-items: center;
 	border: none;
+	height: var(--control-height);
 }
 
 #toolbar .input-container input[type="checkbox"] {
@@ -126,25 +136,20 @@ body {
 }
 
 #content {
-	position: absolute;
-	width: calc(100% - var(--toolbar-width) - 1px);
-	height: calc(100% - var(--header-height));
-	top: var(--header-height);
+	border-right: solid 1px black;
+	bottom: 0;
 	padding: var(--content-padding);
 	background: lightgray;
-}
-
-#content * {
-	position: absolute;
-	padding: var(--content-padding);
-	border: solid 1px black;
+	flex: 1;
 }
 
 #content svg {
-	padding: 10px;
-	width: calc(100% - 2 * var(--content-padding));
-	max-height: calc(100% - 2 * var(--content-padding));
-	aspect-ratio: 1 / 1;
+	position: relative;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+	border: solid 1px black;
+	display: block;
 }
 
 text {
