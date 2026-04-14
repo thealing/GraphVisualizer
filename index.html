@@ -6,9 +6,7 @@
 	<link rel="stylesheet" href="index.css">
 </head>
 <body>
-	<div id="header">
-		Graph Visualizer
-	</div>
+	<div id="header">Graph Visualizer</div>
 	<div id="layout">
 		<div id="content">
 			<svg id="display-svg"></svg>
@@ -23,9 +21,9 @@
 					<label id="distance-label">Edge Length</label>
 					<input id="distance-input" type="number" value="100" />
 					<label id="directed-label">Directed Edges</label>
-					<input id="directed-input" type="checkbox" checked="true" />
+					<input id="directed-input" type="checkbox" checked />
 					<label id="weighted-label">Weighted Edges</label>
-					<input id="weighted-input" type="checkbox" checked="true" />
+					<input id="weighted-input" type="checkbox" checked />
 				</div>
 				<div class="separator"></div>
 				<textarea id="edge-list-edit" placeholder="Edge list goes here"></textarea>
@@ -34,7 +32,7 @@
 				<div class="separator"></div>
 				<div class="input-container">
 					<label id="speed-label">Simulation Speed</label>
-					<input id="speed-input" type="number" value="1" />
+					<input id="speed-input" type="number" value="1" step="0.1" />
 					<label id="manual-label">Manual Mode</label>
 					<input id="manual-input" type="checkbox" />
 				</div>
