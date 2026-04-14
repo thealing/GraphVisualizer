@@ -251,6 +251,7 @@ function update() {
 	const dt = speed; 
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
+	const edgeArray = Array.from(edges.values());
 	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
 			nodes[i].a = new Vector();
@@ -260,40 +261,44 @@ function update() {
 			const b = e.b;
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len();
-			if (l == 0) {
-				continue;
+			if (l > springDistance) {
+				const force = d.mul((l - springDistance) / (l * 100));
+				nodes[a].a = nodes[a].a.add(force);
+				nodes[b].a = nodes[b].a.add(force.neg());
 			}
-			const rv = nodes[b].v.sub(nodes[a].v);
-			const uD = d.div(l);
-			const damping = uD.mul(rv.dot(uD) * 0.05);
-			const force = d.mul((springDistance / l - 1) * 0.01).sub(damping);
-			nodes[a].a = nodes[a].a.add(force.neg());
-			nodes[b].a = nodes[b].a.add(force);
 		}
 		for (const i in nodes) {
 			const d = new Vector(displayWidth / 2, displayHeight / 2).sub(nodes[i].p);
 			const force = d.mul(-0.0005);
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
+		for (let i = 0; i < edgeArray.length; i++) {
+			for (let j = i + 1; j < edgeArray.length; j++) {
+				const e1 = edgeArray[i];
+				const e2 = edgeArray[j];
+				if (e1.a === e2.a || e1.a === e2.b || e1.b === e2.a || e1.b === e2.b) continue;
+				const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
+				const d = cp.pB.sub(cp.pA);
+				const l = d.len();
+				const minD = nodeDistanceMin;
+				if (l < minD && l > 0) {
+					const v = d.mul((minD - l) / l).mul(0.5);
+					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) nodes[e1.a].p = nodes[e1.a].p.sub(v.mul(1 - cp.s));
+					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) nodes[e1.b].p = nodes[e1.b].p.sub(v.mul(cp.s));
+					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) nodes[e2.a].p = nodes[e2.a].p.add(v.mul(1 - cp.t));
+					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) nodes[e2.b].p = nodes[e2.b].p.add(v.mul(cp.t));
+				}
+			}
+		}
 		for (const a in nodes) {
 			for (const b in nodes) {
-				if (b <= a) {
-					continue;
-				}
+				if (b <= a) continue;
 				const d = nodes[b].p.sub(nodes[a].p);
 				const l = d.len();
-				if (l >= nodeDistanceMin) {
-					const force = d.norm().mul(0.01);
-					nodes[a].a = nodes[a].a.add(force.neg());
-					nodes[b].a = nodes[b].a.add(force);
-					continue;
-				}
-				const v = d.norm().mul(nodeDistanceMin - l);
-				if (!nodes[a].dragging && !nodes[a].fixed) {
-					nodes[a].p = nodes[a].p.add(v.div(-2));
-				}
-				if (!nodes[b].dragging && !nodes[b].fixed) {
-					nodes[b].p = nodes[b].p.add(v.div(2));
+				if (l < nodeDistanceMin && l > 0) {
+					const v = d.mul((nodeDistanceMin - l) / l).mul(0.5);
+					if (!nodes[a].dragging && !nodes[a].fixed) nodes[a].p = nodes[a].p.sub(v);
+					if (!nodes[b].dragging && !nodes[b].fixed) nodes[b].p = nodes[b].p.add(v);
 				}
 			}
 		}
@@ -500,8 +505,44 @@ class Vector {
 	}
 	
 	cross(v) {
-		return this.x * v.y - this.x * v.y;
+		return this.x * v.y - this.y * v.x;
 	}
+}
+
+function getClosestPoints(p1, p2, p3, p4) {
+	const u = p2.sub(p1);
+	const v = p4.sub(p3);
+	const w = p1.sub(p3);
+	const a = u.dot(u);
+	const b = u.dot(v);
+	const c = v.dot(v);
+	const d = u.dot(w);
+	const e = v.dot(w);
+	const D = a * c - b * b;
+	let sc, tc;
+	if (D < 1e-6) {
+		sc = 0.0;
+		tc = (b > c ? d / b : e / c);
+	} else {
+		sc = (b * e - c * d) / D;
+		tc = (a * e - b * d) / D;
+	}
+	if (sc < 0.0) sc = 0.0;
+	else if (sc > 1.0) sc = 1.0;
+	tc = (sc * b + e) / c;
+	if (tc < 0.0) {
+		tc = 0.0;
+		sc = Math.max(0.0, Math.min(1.0, -d / a));
+	} else if (tc > 1.0) {
+		tc = 1.0;
+		sc = Math.max(0.0, Math.min(1.0, (b - d) / a));
+	}
+	return {
+		pA: p1.add(u.mul(sc)),
+		pB: p3.add(v.mul(tc)),
+		s: sc,
+		t: tc
+	};
 }
 
 init();
