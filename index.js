@@ -24,9 +24,9 @@ var nodes = new Map();
 
 var edges = new Map();
 
-function onGraphSvgResize(width, height) {
-	displayWidth = width;
-	displayHeight = height;
+function onGraphSvgResize() {
+	displayWidth = displaySvg.clientWidth || displaySvg.getBoundingClientRect().width;
+	displayHeight = displaySvg.clientHeight || displaySvg.getBoundingClientRect().height;
 }
 
 function onUpdate() {
@@ -114,10 +114,9 @@ function onApply() {
 
 function init() {
 	new ResizeObserver(function(entries) {
-		for (const entry of entries) {
-			onGraphSvgResize(entry.contentRect.width, entry.contentRect.height);
-		}
+		onGraphSvgResize();
 	}).observe(displaySvg);
+	window.addEventListener("resize", onGraphSvgResize);
 	const numericInputs = document.querySelectorAll('#toolbar input[type="number"]');
 	numericInputs.forEach(input => {
 		input.addEventListener('keydown', (e) => {
