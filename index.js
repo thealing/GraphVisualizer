@@ -261,18 +261,17 @@ function update() {
 			const b = e.b;
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len() || 0.001;
-			const stretch = l - springDistance;
-			const forceMag = stretch * 0.005;
-			const force = d.mul(forceMag / l);
 			const rv = nodes[b].v.sub(nodes[a].v);
-			const damping = d.mul(rv.dot(d) * 0.02 / (l * l));
-			nodes[a].a = nodes[a].a.add(force.add(damping));
-			nodes[b].a = nodes[b].a.add(force.add(damping).neg());
+			const uD = d.div(l);
+			const damping = uD.mul(rv.dot(uD) * 0.02);
+			const force = d.mul((springDistance / l - 1) * 0.003).sub(damping);
+			nodes[a].a = nodes[a].a.add(force.neg());
+			nodes[b].a = nodes[b].a.add(force);
 		}
 		for (const i in nodes) {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
 			const d = nodes[i].p.sub(center);
-			const force = d.mul(-0.0002);
+			const force = d.mul(0.0002);
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
