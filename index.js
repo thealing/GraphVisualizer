@@ -74,6 +74,34 @@ function onRefresh() {
 	onUpdate()
 }
 
+function onRandom() {
+	const n = randomInt(4, 12);
+	const degree = new Array(n).fill(0);
+	const existingEdges = new Set();
+	let lines = "";
+	function addEdgeInternal(a, b) {
+		if (a === b || existingEdges.has(`${a}-${b}`) || existingEdges.has(`${b}-${a}`)) return false;
+		if (degree[a] >= 4 || degree[b] >= 4) return false;
+		existingEdges.add(`${a}-${b}`);
+		degree[a]++;
+		degree[b]++;
+		const w = randomInt(1, 9);
+		lines += `${a} ${b} ${w}\n`;
+		return true;
+	}
+	const extraEdges = Math.floor(n * 1.5);
+	let added = 0;
+	while (added < extraEdges) {
+		const a = randomInt(0, n - 1);
+		const b = randomInt(0, n - 1);
+		if (addEdgeInternal(a, b)) {
+			added++;
+		}
+	}
+	edgeListEdit.value = lines;
+	onUpdate();
+}
+
 function onApply() {
 	globalSpeed = Number(speedInput.value);
 	nodeRadius = Number(nodeSizeInput.value);
@@ -157,23 +185,6 @@ function init() {
 		draggingBackground = false;
 	});
 	onApply();
-	edgeListEdit.value = "";
-	edgeListEdit.value += "0 4 2\n";
-	edgeListEdit.value += "0 1 4\n";
-	edgeListEdit.value += "9 8 2\n";
-	edgeListEdit.value += "8 9 1\n";
-	edgeListEdit.value += "6 9 7\n";
-	edgeListEdit.value += "6 7 2\n";
-	edgeListEdit.value += "3 7 5\n";
-	edgeListEdit.value += "2 3 3\n";
-	edgeListEdit.value += "2 6 6\n";
-	edgeListEdit.value += "1 2 7\n";
-	edgeListEdit.value += "1 5 9\n";
-	edgeListEdit.value += "5 8 4\n";
-	edgeListEdit.value += "5 6 8\n";
-	edgeListEdit.value += "5 1 7\n";
-	edgeListEdit.value += "4 8 3\n";
-	edgeListEdit.value += "4 5 1\n";
 	onUpdate();
 	update();
 }
