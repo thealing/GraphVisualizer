@@ -163,26 +163,22 @@ function update() {
 		const y1 = start.y;
 		const x2 = end.x;
 		const y2 = end.y;
-		const lineLen = v.len() - nodeRadius * 2;
 		const scale = Math.min(v.len() - nodeRadius * 2, nodeRadius) / 20;
-    const arrowZone = (10 * scale) + 2;
-
-    // 3. Target the 2/3 position, but clamp it
-    // We want the text at 0.66, but it must be at most (lineLen - arrowZone) 
-    // away from the start point.
-    const targetDist = drawArrows ? lineLen * (2/3) : lineLen * 0.5;
-    const safeDist = Math.min(targetDist, lineLen - arrowZone);
-
-    // 4. Calculate the new mx, my based on the safe distance
-    const lerp = safeDist / lineLen;
 		const dx = x2 - x1;
 		const dy = y2 - y1;
-    const mx = x1 + dx * lerp;
-    const my = y1 + dy * lerp;
+		const bbox = elem.text.getBBox();
 		const len = Math.hypot(dx, dy) || 1;
+		const ux = dx / len;
+		const uy = dy / len;
+		const dot = Math.abs(ux) * (bbox.width / 2) + Math.abs(uy) * (bbox.height / 2);
+		const arrowRadius = 10 * scale;
+		const minEndDistance = arrowRadius + dot;
+		const distance = Math.max(len / 3, Math.min(drawArrows ? len * 2 / 3 : len * 0.5, len - minEndDistance));
+		const lerp = distance / len;
+		const mx = x1 + dx * lerp;
+		const my = y1 + dy * lerp;
 		const nx = -dy / len;
 		const ny = dx / len;
-		const bbox = elem.text.getBBox();
 		const halfExtent = Math.abs(nx) * (bbox.width / 2) + Math.abs(ny) * (bbox.height / 2);
 		const offset = halfExtent + springDistance / 100;
 		elem.line.setAttribute("x1", start.x);
