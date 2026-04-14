@@ -75,11 +75,13 @@ function onRefresh() {
 }
 
 function onApply() {
+	globalSpeed = Number(speedInput.value);
 	nodeRadius = Number(nodeSizeInput.value);
 	nodeDistanceMin = Number(nodeMarginInput.value);
 	nodeDistanceMin += nodeRadius * 2;
 	springDistance = Number(distanceInput.value);
 	springDistance += nodeRadius * 2;
+	globalSpeed = Number(speedInput.value);
 }
 
 function init() {
@@ -104,6 +106,7 @@ function init() {
 	displaySvg.appendChild(nodesLayer);
 	displaySvg.appendChild(edgesLayer);
 	draggingBackground = false;
+	globalSpeed = 1;
 	let lastX = 0;
 	let lastY = 0;
 	displaySvg.addEventListener("mousedown", (e) => {
@@ -132,24 +135,24 @@ function init() {
 		draggingBackground = false;
 	});
 	onApply();
-  edgeListEdit.value = "";
-  edgeListEdit.value += "0 4 2\n";
-  edgeListEdit.value += "0 1 4\n";
-  edgeListEdit.value += "9 8 2\n";
-  edgeListEdit.value += "8 9 1\n";
-  edgeListEdit.value += "6 9 7\n";
-  edgeListEdit.value += "6 7 2\n";
-  edgeListEdit.value += "3 7 5\n";
-  edgeListEdit.value += "2 3 3\n";
-  edgeListEdit.value += "2 6 6\n";
-  edgeListEdit.value += "1 2 7\n";
-  edgeListEdit.value += "1 5 9\n";
-  edgeListEdit.value += "5 8 4\n";
-  edgeListEdit.value += "5 6 8\n";
-  edgeListEdit.value += "5 1 7\n";
-  edgeListEdit.value += "4 8 3\n";
-  edgeListEdit.value += "4 5 1\n";
-  onUpdate();
+	edgeListEdit.value = "";
+	edgeListEdit.value += "0 4 2\n";
+	edgeListEdit.value += "0 1 4\n";
+	edgeListEdit.value += "9 8 2\n";
+	edgeListEdit.value += "8 9 1\n";
+	edgeListEdit.value += "6 9 7\n";
+	edgeListEdit.value += "6 7 2\n";
+	edgeListEdit.value += "3 7 5\n";
+	edgeListEdit.value += "2 3 3\n";
+	edgeListEdit.value += "2 6 6\n";
+	edgeListEdit.value += "1 2 7\n";
+	edgeListEdit.value += "1 5 9\n";
+	edgeListEdit.value += "5 8 4\n";
+	edgeListEdit.value += "5 6 8\n";
+	edgeListEdit.value += "5 1 7\n";
+	edgeListEdit.value += "4 8 3\n";
+	edgeListEdit.value += "4 5 1\n";
+	onUpdate();
 	update();
 }
 
@@ -220,9 +223,9 @@ function update() {
 	if (draggingBackground) {
 		return;
 	}
-	const speed = speedInput.value;
 	const manualMode = manualInput.checked;
-	if (manualMode || speed < 1) {
+	const speed = globalSpeed;
+	if (manualMode || speed <= 0) {
 		const minDistance = nodeDistanceMin;
 		for (const a in nodes) {
 			for (const b in nodes) {
@@ -245,7 +248,10 @@ function update() {
 		}
 		return;
 	}
-	for (let step = 0; step < speed; step++) {
+	const dt = speed; 
+	const subSteps = Math.ceil(dt);
+	const stepSize = dt / subSteps;
+	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
 			nodes[i].a = new Vector();
 		}
@@ -257,7 +263,10 @@ function update() {
 			if (l == 0) {
 				continue;
 			}
-			const force = d.mul((springDistance / l - 1) * 0.01);
+			const rv = nodes[b].v.sub(nodes[a].v);
+			const uD = d.div(l);
+			const damping = uD.mul(rv.dot(uD) * 0.05);
+			const force = d.mul((springDistance / l - 1) * 0.01).sub(damping);
 			nodes[a].a = nodes[a].a.add(force.neg());
 			nodes[b].a = nodes[b].a.add(force);
 		}
@@ -290,15 +299,16 @@ function update() {
 		}
 		for (const i in nodes) {
 			nodes[i].v = nodes[i].v.add(nodes[i].a);
-			nodes[i].v = nodes[i].v.mul(0.9);
+			nodes[i].v = nodes[i].v.mul((0.9));
 			const l = nodes[i].v.len();
-			if (l > nodeRadius / 2) {
-				nodes[i].v = nodes[i].v.mul(nodeRadius / 2 / l);
+			const limit = nodeRadius * 0.7;
+			if (l > limit) {
+				nodes[i].v = nodes[i].v.mul(limit / l);
 			}
 		}
 		for (const i in nodes) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
-				nodes[i].p = nodes[i].p.add(nodes[i].v);
+				nodes[i].p = nodes[i].p.add(nodes[i].v.mul(stepSize));
 			}
 		}
 	}
