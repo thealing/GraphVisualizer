@@ -260,23 +260,19 @@ function update() {
 			const a = e.a;
 			const b = e.b;
 			const d = nodes[b].p.sub(nodes[a].p);
-			const l = d.len() || 0.01;
-			// Hooke's Law: Force proportional to displacement from equilibrium
+			const l = d.len() || 0.001;
 			const stretch = l - springDistance;
-			const forceMag = stretch * 0.005; // Spring constant
+			const forceMag = stretch * 0.005;
 			const force = d.mul(forceMag / l);
-			
-			// Damping relative velocity to prevent oscillation
 			const rv = nodes[b].v.sub(nodes[a].v);
 			const damping = d.mul(rv.dot(d) * 0.02 / (l * l));
-			
 			nodes[a].a = nodes[a].a.add(force.add(damping));
 			nodes[b].a = nodes[b].a.add(force.add(damping).neg());
 		}
 		for (const i in nodes) {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
 			const d = nodes[i].p.sub(center);
-			const force = d.mul(-0.0002); // Weak centering force
+			const force = d.mul(-0.0002);
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
@@ -288,18 +284,15 @@ function update() {
 				const d = cp.pB.sub(cp.pA);
 				let l = d.len();
 				const minD = nodeDistanceMin;
-				
 				if (l < minD) {
-					// Resolve intersection by pushing along the normal if l is too small
 					let dir;
 					if (l < 0.01) {
 						const edge1Dir = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
-						dir = new Vector(-edge1Dir.y, edge1Dir.x); // Normal to edge 1
+						dir = new Vector(-edge1Dir.y, edge1Dir.x);
 						l = 0.01;
 					} else {
 						dir = d.div(l);
 					}
-					
 					const forceMag = (minD - l) * 0.02;
 					const v = dir.mul(forceMag);
 					const sd = 0.5;
@@ -316,7 +309,6 @@ function update() {
 				const d = nodes[b].p.sub(nodes[a].p);
 				const l = d.len() || 0.01;
 				if (l < nodeDistanceMin) {
-					// Use velocity impulses instead of positional snaps to eliminate jitter
 					const forceMag = (nodeDistanceMin - l) * 0.05;
 					const v = d.mul(forceMag / l);
 					if (!nodes[a].dragging && !nodes[a].fixed) nodes[a].v = nodes[a].v.sub(v);
