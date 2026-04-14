@@ -118,6 +118,13 @@ function init() {
 		lastY = e.clientY;
 		e.stopPropagation();
 	});
+	displaySvg.addEventListener("touchstart", (e) => {
+		if (e.touches.length != 1) return;
+		draggingBackground = true;
+		lastX = e.touches[0].clientX;
+		lastY = e.touches[0].clientY;
+		e.stopPropagation();
+	}, { passive: false });
 	window.addEventListener("mousemove", (e) => {
 		if (!draggingBackground) {
 			return;
@@ -131,7 +138,22 @@ function init() {
 			nodes[i].p.y += dy;
 		}
 	});
+	window.addEventListener("touchmove", (e) => {
+		if (!draggingBackground || e.touches.length != 1) return;
+		const dx = e.touches[0].clientX - lastX;
+		const dy = e.touches[0].clientY - lastY;
+		lastX = e.touches[0].clientX;
+		lastY = e.touches[0].clientY;
+		for (const i in nodes) {
+			nodes[i].p.x += dx;
+			nodes[i].p.y += dy;
+		}
+		e.preventDefault();
+	}, { passive: false });
 	window.addEventListener("mouseup", () => {
+		draggingBackground = false;
+	});
+	window.addEventListener("touchend", () => {
 		draggingBackground = false;
 	});
 	onApply();
@@ -422,10 +444,21 @@ function Node(x, y, i) {
 		document.body.style.cursor = "grabbing\n";
 		e.stopPropagation();
 	});
+	this.svgElement.addEventListener("touchstart", e => {
+		if (e.touches.length != 1) return;
+		this.dragging = true;
+		this.grabOffset = this.p.sub(new Vector(e.touches[0].clientX, e.touches[0].clientY));
+		e.stopPropagation();
+	}, { passive: false });
 	document.addEventListener("mouseup", e => {
 		if (this.dragging) {
 			this.dragging = false;
 			document.body.style.cursor = "grab\n";
+		}
+	});
+	document.addEventListener("touchend", e => {
+		if (this.dragging) {
+			this.dragging = false;
 		}
 	});
  	document.addEventListener("mousemove", e => {
@@ -434,6 +467,12 @@ function Node(x, y, i) {
 			this.p = new Vector(e.clientX, e.clientY).add(this.grabOffset);
 		}
 	});
+	document.addEventListener("touchmove", e => {
+		if (this.dragging && e.touches.length == 1) {
+			this.p = new Vector(e.touches[0].clientX, e.touches[0].clientY).add(this.grabOffset);
+			e.preventDefault();
+		}
+	}, { passive: false });
 	this.svgElement.addEventListener("mouseenter", e => {
 		if (!this.dragging) {
 			document.body.style.cursor = "grab\n";
