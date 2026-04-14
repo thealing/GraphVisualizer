@@ -293,7 +293,7 @@ function update() {
 		for (const i in nodes) {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
 			const d = nodes[i].p.sub(center);
-			const force = d.mul(0.0002);
+			const force = d.mul(0.0005);
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
@@ -317,10 +317,10 @@ function update() {
 					const forceMag = (minD - l) * 0.02;
 					const v = dir.mul(forceMag);
 					const sd = 0.5;
-					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) nodes[e1.a].v = nodes[e1.a].v.sub(v.mul(1 - cp.s).mul(sd));
-					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) nodes[e1.b].v = nodes[e1.b].v.sub(v.mul(cp.s).mul(sd));
-					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) nodes[e2.a].v = nodes[e2.a].v.add(v.mul(1 - cp.t).mul(sd));
-					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) nodes[e2.b].v = nodes[e2.b].v.add(v.mul(cp.t).mul(sd));
+					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
+					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
+					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
+					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
 				}
 			}
 		}
@@ -339,7 +339,7 @@ function update() {
 		}
 		for (const i in nodes) {
 			nodes[i].v = nodes[i].v.add(nodes[i].a);
-			nodes[i].v = nodes[i].v.mul(0.95);
+			nodes[i].v = nodes[i].v.mul(0.9);
 			const l = nodes[i].v.len();
 			const limit = nodeRadius * 0.7;
 			if (l > limit) {
