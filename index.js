@@ -575,67 +575,103 @@ class Vector {
 	}
 }
 
-function getCollision(p1, p2, p3, p4, radius) {
-    const u = p2.sub(p1); // Vector Edge 1
-    const v = p4.sub(p3); // Vector Edge 2
-    const w = p1.sub(p3);
+function getCollision(s1, e1, s2, e2, capsuleRadius) {
+	const u = e1.sub(s1);
+	const v = e2.sub(s2);
+	const w = s1.sub(s2);
+	const a = u.dot(u);
+	const b = u.dot(v);
+	const c = v.dot(v);
+	const d = u.dot(w);
+	const e = v.dot(w);
+	const D = a * c - b * b;
+  const E = 1e-6;
+	let sc, tc;
+	if (D < E) { 
+		if (a < E && c < E) {
+			sc = 0;
+			tc = 0;
+		} else if (a < E) {
+			sc = 0;
+			tc = Math.max(0, Math.min(1, e / c));
+		} else if (c < E) {
+			tc = 0;
+			sc = Math.max(0, Math.min(1, -d / a));
+		} else {
+			const t0 = -d / a;
+			const t1 = (b - d) / a;
+			const sm = Math.max(0, Math.min(1, Math.min(t0, t1)));
+			const sh = Math.max(0, Math.min(1, Math.max(t0, t1)));
+			sc = (sm + sh) * 0.5;
+			tc = Math.max(0, Math.min(1, (b * sc + e) / c));
+		}
+	}
+  else {
+		sc = (b * e - c * d) / D;
+		tc = (a * e - b * d) / D;
+		if (sc < 0) {
+			sc = 0;
+			tc = e / c;
+		}
+    else if (sc > 1) {
+			sc = 1;
+			tc = (b + e) / c;
+		}
+		if (tc < 0) {
+			tc = 0;
+			sc = Math.max(0, Math.min(1, -d / a));
+		}
+    else if (tc > 1) {
+			tc = 1;
+			sc = Math.max(0, Math.min(1, (b - d) / a));
+		}
+	}
+	sc = Math.max(0, Math.min(1, sc));
+	tc = Math.max(0, Math.min(1, tc));
+	const p1 = s1.add(u.mul(sc));
+	const p2 = s2.add(v.mul(tc));
+	const diff = p1.sub(p2);
+	const distSq = diff.lensq();
+	const r2 = capsuleRadius * 2;
+	if (distSq < r2 * r2) {
+		const dist = Math.sqrt(distSq);
+		let normal;
+		if (dist < E) {
+      const uNorm = u.norm();
+			const vNorm = v.norm();
+			
+			// Calculate the bisector of the two directions.
+			// We use the difference to find the "middle" direction 
+			// if they are pointing in similar directions.
+			const bisector = uNorm.sub(vNorm);
 
-    const a = u.dot(u);
-    const b = u.dot(v);
-    const c = v.dot(v);
-    const d = u.dot(w);
-    const e = v.dot(w);
-
-    const D = a * c - b * b; // Determinant
-    let sc, tc;
-
-    // 1. Calculate parametric constants sc and tc
-    if (D < 0.000001) { 
-        // Parallel lines: fix sc, solve for tc
-        sc = 0.0;
-        tc = (b > c) ? d / b : e / c;
-    } else {
-        sc = (b * e - c * d) / D;
-        tc = (a * e - b * d) / D;
-    }
-
-    // 2. Clamp to segment boundaries
-    sc = Math.max(0, Math.min(1, sc));
-    tc = Math.max(0, Math.min(1, tc));
-
-    const closestP1 = p1.add(u.mul(sc));
-    const closestP2 = p3.add(v.mul(tc));
-    const diff = closestP1.sub(closestP2);
-    const distanceSq = diff.dot(diff);
-    const minDist = radius * 2;
-
-    if (distanceSq < minDist * minDist) {
-        const distance = Math.sqrt(distanceSq);
-        let normal;
-
-        if (distance > 0.000001) {
-            // Standard normal
-            normal = diff.div(distance);
-        } else {
-            // Shared vertex or exact intersection: 
-            // Generate a normal perpendicular to the plane of the two edges
-            const dir1 = u.norm();
-            const dir2 = v.norm();
-            // 2D Perpendicular fallback
-            const combined = dir1.sub(dir2).norm();
-            normal = new Vector(-combined.y, combined.x);
-        }
-
-        return {
-            sc: sc,
-            tc: tc,
-            normal: normal,
-            depth: minDist - distance,
-            distance: distance
-        };
-    }
-
-    return null;
+			// If segments are nearly parallel (u - v is zero), 
+			// the bisector is just the perpendicular.
+			if (bisector.lensq() < 1e-9) {
+				normal = uNorm.left();
+			} else {
+				// The normal is the perpendicular to the bisector,
+				// which averages the two segment normals.
+				normal = bisector.norm();
+				
+				// Ensure it points "away" from the intersection logic
+				// by checking against the relative cross product.
+				if (u.cross(v) < 0) {
+					normal = normal.neg();
+				}
+			}
+		}
+    else {
+			normal = diff.div(dist);
+		}
+		return {
+			sc: sc,
+			tc: tc,
+			normal: normal,
+			depth: r2 - dist
+		};
+	}
+	return null;
 }
 
 init();
