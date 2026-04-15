@@ -311,22 +311,38 @@ function update() {
 				const e1 = edgeArray[i];
 				const e2 = edgeArray[j];
 				const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
-				const d = cp.pB.sub(cp.pA);
-				let l = d.len();
+				const distVec = cp.pB.sub(cp.pA);
+				const l = distVec.len();
 				const minD = nodeDistanceMin;
+				
 				if (l < minD) {
-					let axis, sc = cp.s, tc = cp.t;
+					// 1. Find the separating axis (Normal or Closest Point Vector)
+					let axis;
 					if (l > 0.1) {
-						axis = d.div(l);
+						axis = distVec.div(l);
 					} else {
-						// Intersecting or shared node: find separating axis (normal to e1)
 						const e1v = nodes[e1.b].p.sub(nodes[e1.a].p);
 						axis = new Vector(-e1v.y, e1v.x).norm();
 						const c1 = nodes[e1.a].p.add(nodes[e1.b].p).mul(0.5);
 						const c2 = nodes[e2.a].p.add(nodes[e2.b].p).mul(0.5);
 						if (axis.dot(c2.sub(c1)) < 0) axis = axis.neg();
-						l = 0;
 					}
+					
+					// 2. Determine contact points (sc, tc) by finding the midpoint of the overlap
+					// This creates torque for connected edges and handles all cases (parallel, crossing) robustly.
+					const L1 = nodes[e1.b].p.sub(nodes[e1.a].p).len() || 1;
+					const L2 = nodes[e2.b].p.sub(nodes[e2.a].p).len() || 1;
+					const r_eff = minD / 2;
+					
+					const e1dir = nodes[e1.b].p.sub(nodes[e1.a].p).div(L1);
+					const d3 = nodes[e2.a].p.sub(nodes[e1.a].p).dot(e1dir);
+					const d4 = nodes[e2.b].p.sub(nodes[e1.a].p).dot(e1dir);
+					const sc = (Math.max(0, Math.min(d3, d4) - r_eff) + Math.min(L1, Math.max(d3, d4) + r_eff)) / (2 * L1);
+					
+					const e2dir = nodes[e2.b].p.sub(nodes[e2.a].p).div(L2);
+					const d1 = nodes[e1.a].p.sub(nodes[e2.a].p).dot(e2dir);
+					const d2 = nodes[e1.b].p.sub(nodes[e2.a].p).dot(e2dir);
+					const tc = (Math.max(0, Math.min(d1, d2) - r_eff) + Math.min(L2, Math.max(d1, d2) + r_eff)) / (2 * L2);
 
 					const forceMag = (minD - l) * 0.05;
 					const v = axis.mul(forceMag);
