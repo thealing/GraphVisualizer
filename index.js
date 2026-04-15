@@ -81,11 +81,11 @@ function onRandom() {
 	let lines = "";
 	function addEdgeInternal(a, b) {
 		if (a === b || existingEdges.has(`${a}-${b}`)) {
-      return false;
-    }
+			return false;
+		}
 		if (degree[a] >= 4 || degree[b] >= 4) {
-      return false;
-    }
+			return false;
+		}
 		existingEdges.add(`${a}-${b}`);
 		degree[a]++;
 		degree[b]++;
@@ -151,8 +151,8 @@ function init() {
 	});
 	displaySvg.addEventListener("touchstart", (e) => {
 		if (e.touches.length != 1) {
-      return;
-    }
+			return;
+		}
 		draggingBackground = true;
 		lastX = e.touches[0].clientX;
 		lastY = e.touches[0].clientY;
@@ -173,8 +173,8 @@ function init() {
 	});
 	window.addEventListener("touchmove", (e) => {
 		if (!draggingBackground || e.touches.length != 1) {
-      return;
-    }
+			return;
+		}
 		const dx = e.touches[0].clientX - lastX;
 		const dy = e.touches[0].clientY - lastY;
 		lastX = e.touches[0].clientX;
@@ -302,45 +302,56 @@ function update() {
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len() || 0.001;
 			const force = d.mul((springDistance / l - 1) * 0.003);
-			// nodes[a].a = nodes[a].a.add(force.neg());
-			// nodes[b].a = nodes[b].a.add(force);
+			nodes[a].a = nodes[a].a.add(force.neg());
+			nodes[b].a = nodes[b].a.add(force);
 		}
 		for (const i in nodes) {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
 			const d = nodes[i].p.sub(center);
 			const force = d.mul(0.0005);
-			// nodes[i].a = nodes[i].a.add(force.neg());
+			nodes[i].a = nodes[i].a.add(force.neg());
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e1 = edgeArray[i], e2 = edgeArray[j];
 				const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
-				const d = cp.pB.sub(cp.pA);
+				const d = cp.p2.sub(cp.p1);
+				const minD = nodeDistanceMin;
 				let l = d.len();
-				if (l < nodeRadius) {
+				if (l < minD) {
 					let dir;
-					if (l < 0.01) {
-						const edge1Dir = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
-						dir = new Vector(-edge1Dir.y, edge1Dir.x);
-						l = 0.01;
-					} else {
-						dir = d.div(l);
+					if (l < 1e-3) {
+						const d1 = nodes[e1.b].p.sub(nodes[e1.a].p).norm().left();
+						const d2 = nodes[e2.b].p.sub(nodes[e2.a].p).norm().left();
+						const dir1 = d1.add(d2);
+						const dir2 = d1.sub(d2);
+						if (dir1.lensq() > dir2.lensq()) {
+							dir = dir1;
+						}
+						else {
+							dir = dir2;
+						}
+						l = dir.len();
 					}
-					const forceMag = (nodeRadius - l) * 0.02;
+					else {
+						dir = d;
+					}
+					dir = dir.div(l);
+					const forceMag = (minD - l) * 0.04;
 					const v = dir.mul(forceMag);
 					const sd = 0.5;
 					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
-            nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
-          }
+						nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
+					}
 					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
-            nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
-          }
+						nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
+					}
 					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
-            nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
-          }
+						nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
+					}
 					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
-            nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
-          }
+						nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
+					}
 				}
 			}
 		}
@@ -353,11 +364,11 @@ function update() {
 					const forceMag = (nodeDistanceMin - l) * 0.05;
 					const f = d.mul(forceMag / l);
 					if (!nodes[a].dragging && !nodes[a].fixed) {
-            nodes[a].a = nodes[a].a.sub(f);
-          }
+						nodes[a].a = nodes[a].a.sub(f);
+					}
 					if (!nodes[b].dragging && !nodes[b].fixed) {
-            nodes[b].a = nodes[b].a.add(f);
-          }
+						nodes[b].a = nodes[b].a.add(f);
+					}
 				}
 			}
 		}
@@ -587,35 +598,36 @@ class Vector {
 
 function getClosestPoints(p1, p2, p3, p4) {
 	const u = p2.sub(p1);
-  const v = p4.sub(p3);
-  const w = p1.sub(p3);
-  const a = u.dot(u);
-  const b = u.dot(v);
-  const c = v.dot(v);
-  const d = u.dot(w);
-  const e = v.dot(w);
-  const D = a * c - b * b;
-  const E = 1e-6;
-  if (D < E) {
-    const s0 = Math.max(0, Math.min(1, a < E ? 0 : p3.sub(p1).dot(u) / a));
-    const s1 = Math.max(0, Math.min(1, a < E ? 0 : p4.sub(p1).dot(u) / a));
-    const t0 = Math.max(0, Math.min(1, c < E ? 0 : p1.sub(p3).dot(v) / c));
-    const t1 = Math.max(0, Math.min(1, c < E ? 0 : p2.sub(p3).dot(v) / c));
-    s = (s0 + s1) / 2;
-    t = (t0 + t1) / 2;
-  } else {
-    s = (b * e - c * d) / D;
-    t = (a * e - b * d) / D;
-    if (s < 0 || s > 1) {
-      s = Math.max(0, Math.min(1, s));
-      t = (s * b + e) / c;
-    }
-    if (t < 0 || t > 1) {
-      t = Math.max(0, Math.min(1, t));
-      s = Math.max(0, Math.min(1, (t * b - d) / a));
-    }
-  }
-  return { s, t };
+	const v = p4.sub(p3);
+	const w = p1.sub(p3);
+	const a = u.dot(u);
+	const b = u.dot(v);
+	const c = v.dot(v);
+	const d = u.dot(w);
+	const e = v.dot(w);
+	const D = a * c - b * b;
+	const E = 1e-6;
+	if (D < E) {
+		const s0 = Math.max(0, Math.min(1, a < E ? 0 : p3.sub(p1).dot(u) / a));
+		const s1 = Math.max(0, Math.min(1, a < E ? 0 : p4.sub(p1).dot(u) / a));
+		const t0 = Math.max(0, Math.min(1, c < E ? 0 : p1.sub(p3).dot(v) / c));
+		const t1 = Math.max(0, Math.min(1, c < E ? 0 : p2.sub(p3).dot(v) / c));
+		s = (s0 + s1) / 2;
+		t = (t0 + t1) / 2;
+	}
+	else {
+		s = (b * e - c * d) / D;
+		t = (a * e - b * d) / D;
+		if (s < 0 || s > 1) {
+			s = Math.max(0, Math.min(1, s));
+			t = (s * b + e) / c;
+		}
+		if (t < 0 || t > 1) {
+			t = Math.max(0, Math.min(1, t));
+			s = Math.max(0, Math.min(1, (t * b - d) / a));
+		}
+	}
+	return { s, t, p1: p1.add(u.mul(s)), p2: p3.add(v.mul(t)) };
 }
 
 
