@@ -292,6 +292,9 @@ function update() {
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
 	const edgeArray = Array.from(edges.values());
+	for (const i in nodes) {
+		edgeArray.push(new Edge(i, i));
+	}
 	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
 			nodes[i].a = new Vector();
@@ -321,15 +324,14 @@ function update() {
 				if (l < minD) {
 					let dir;
 					if (l < 1e-3) {
-						const d1 = nodes[e1.b].p.sub(nodes[e1.a].p).norm().left();
-						const d2 = nodes[e2.b].p.sub(nodes[e2.a].p).norm().left();
-						const dir1 = d1.add(d2);
-						const dir2 = d1.sub(d2);
-						if (dir1.lensq() > dir2.lensq()) {
-							dir = dir1;
+						const v1 = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
+						const v2 = nodes[e2.b].p.sub(nodes[e2.a].p).norm();
+						dir = v1.sub(v2); 
+						if (dir.len() < 1e-3) {
+							dir = v1.left();
 						}
 						else {
-							dir = dir2;
+							dir = dir.left().norm();
 						}
 						l = dir.len();
 					}
@@ -525,8 +527,10 @@ function Edge(a, b, weight) {
 	this.b = b;
 	this.weight = weight;
 	this.gen = 1;
-	this.svgElement = createSvgEdge();
-	this.arrow = createSvgArrow();
+	if (a != b) {
+		this.svgElement = createSvgEdge();
+		this.arrow = createSvgArrow();
+	}
 }
 
 function randomInt(min, max) {
