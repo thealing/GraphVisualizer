@@ -266,7 +266,7 @@ function update() {
 	const manualMode = manualInput.checked;
 	const speed = globalSpeed;
 	if (manualMode || speed <= 0) {
-		const minDistance = nodeRadius * 2;
+		const minDistance = nodeDistanceMin;
 		for (const a in nodes) {
 			for (const b in nodes) {
 				if (b <= a) {
