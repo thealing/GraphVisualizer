@@ -314,23 +314,33 @@ function update() {
 		for (let i = 0; i < edgeArray.length; i++) {
 			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e1 = edgeArray[i], e2 = edgeArray[j];
-				const collision = getCollision(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p, nodeRadius);
-				if (collision) {
-					const sc = collision.sc;
-					const tc = collision.tc;
-					const f = collision.normal.mul(collision.depth * 0.5);
+				const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
+				const d = cp.pB.sub(cp.pA);
+				let l = d.len();
+				if (l < nodeRadius) {
+					let dir;
+					if (l < 0.01) {
+						const edge1Dir = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
+						dir = new Vector(-edge1Dir.y, edge1Dir.x);
+						l = 0.01;
+					} else {
+						dir = d.div(l);
+					}
+					const forceMag = (nodeRadius - l) * 0.02;
+					const v = dir.mul(forceMag);
+					const sd = 0.5;
 					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
-						nodes[e1.a].a = nodes[e1.a].a.add(f.mul(1 - sc));
-					}
+            nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
+          }
 					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
-						nodes[e1.b].a = nodes[e1.b].a.add(f.mul(sc));
-					}
+            nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
+          }
 					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
-						nodes[e2.a].a = nodes[e2.a].a.sub(f.mul(1 - tc));
-					}
+            nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
+          }
 					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
-						nodes[e2.b].a = nodes[e2.b].a.sub(f.mul(tc));
-					}
+            nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
+          }
 				}
 			}
 		}
@@ -575,103 +585,38 @@ class Vector {
 	}
 }
 
-function getCollision(s1, e1, s2, e2, capsuleRadius) {
-	const u = e1.sub(s1);
-	const v = e2.sub(s2);
-	const w = s1.sub(s2);
-	const a = u.dot(u);
-	const b = u.dot(v);
-	const c = v.dot(v);
-	const d = u.dot(w);
-	const e = v.dot(w);
-	const D = a * c - b * b;
+function getClosestPoints(p1, p2, p3, p4) {
+	const u = p2.sub(p1);
+  const v = p4.sub(p3);
+  const w = p1.sub(p3);
+  const a = u.dot(u);
+  const b = u.dot(v);
+  const c = v.dot(v);
+  const d = u.dot(w);
+  const e = v.dot(w);
+  const D = a * c - b * b;
   const E = 1e-6;
-	let sc, tc;
-	if (D < E) { 
-		if (a < E && c < E) {
-			sc = 0;
-			tc = 0;
-		} else if (a < E) {
-			sc = 0;
-			tc = Math.max(0, Math.min(1, e / c));
-		} else if (c < E) {
-			tc = 0;
-			sc = Math.max(0, Math.min(1, -d / a));
-		} else {
-			const t0 = -d / a;
-			const t1 = (b - d) / a;
-			const sm = Math.max(0, Math.min(1, Math.min(t0, t1)));
-			const sh = Math.max(0, Math.min(1, Math.max(t0, t1)));
-			sc = (sm + sh) * 0.5;
-			tc = Math.max(0, Math.min(1, (b * sc + e) / c));
-		}
-	}
-  else {
-		sc = (b * e - c * d) / D;
-		tc = (a * e - b * d) / D;
-		if (sc < 0) {
-			sc = 0;
-			tc = e / c;
-		}
-    else if (sc > 1) {
-			sc = 1;
-			tc = (b + e) / c;
-		}
-		if (tc < 0) {
-			tc = 0;
-			sc = Math.max(0, Math.min(1, -d / a));
-		}
-    else if (tc > 1) {
-			tc = 1;
-			sc = Math.max(0, Math.min(1, (b - d) / a));
-		}
-	}
-	sc = Math.max(0, Math.min(1, sc));
-	tc = Math.max(0, Math.min(1, tc));
-	const p1 = s1.add(u.mul(sc));
-	const p2 = s2.add(v.mul(tc));
-	const diff = p1.sub(p2);
-	const distSq = diff.lensq();
-	const r2 = capsuleRadius * 2;
-	if (distSq < r2 * r2) {
-		const dist = Math.sqrt(distSq);
-		let normal;
-		if (dist < E) {
-      const uNorm = u.norm();
-			const vNorm = v.norm();
-			
-			// Calculate the bisector of the two directions.
-			// We use the difference to find the "middle" direction 
-			// if they are pointing in similar directions.
-			const bisector = uNorm.sub(vNorm);
-
-			// If segments are nearly parallel (u - v is zero), 
-			// the bisector is just the perpendicular.
-			if (bisector.lensq() < 1e-9) {
-				normal = uNorm.left();
-			} else {
-				// The normal is the perpendicular to the bisector,
-				// which averages the two segment normals.
-				normal = bisector.norm();
-				
-				// Ensure it points "away" from the intersection logic
-				// by checking against the relative cross product.
-				if (u.cross(v) < 0) {
-					normal = normal.neg();
-				}
-			}
-		}
-    else {
-			normal = diff.div(dist);
-		}
-		return {
-			sc: sc,
-			tc: tc,
-			normal: normal,
-			depth: r2 - dist
-		};
-	}
-	return null;
+  if (D < E) {
+    const s0 = Math.max(0, Math.min(1, a < E ? 0 : p3.sub(p1).dot(u) / a));
+    const s1 = Math.max(0, Math.min(1, a < E ? 0 : p4.sub(p1).dot(u) / a));
+    const t0 = Math.max(0, Math.min(1, c < E ? 0 : p1.sub(p3).dot(v) / c));
+    const t1 = Math.max(0, Math.min(1, c < E ? 0 : p2.sub(p3).dot(v) / c));
+    s = (s0 + s1) / 2;
+    t = (t0 + t1) / 2;
+  } else {
+    s = (b * e - c * d) / D;
+    t = (a * e - b * d) / D;
+    if (s < 0 || s > 1) {
+      s = Math.max(0, Math.min(1, s));
+      t = (s * b + e) / c;
+    }
+    if (t < 0 || t > 1) {
+      t = Math.max(0, Math.min(1, t));
+      s = Math.max(0, Math.min(1, (t * b - d) / a));
+    }
+  }
+  return { s, t };
 }
+
 
 init();
