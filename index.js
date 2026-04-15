@@ -315,21 +315,26 @@ function update() {
 				let l = d.len();
 				const minD = nodeDistanceMin;
 				if (l < minD) {
-					let dir;
-					if (l < 0.01) {
-						const edge1Dir = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
-						dir = new Vector(-edge1Dir.y, edge1Dir.x);
-						l = 0.01;
+					let axis, sc = cp.s, tc = cp.t;
+					if (l > 0.1) {
+						axis = d.div(l);
 					} else {
-						dir = d.div(l);
+						// Intersecting or shared node: find separating axis (normal to e1)
+						const e1v = nodes[e1.b].p.sub(nodes[e1.a].p);
+						axis = new Vector(-e1v.y, e1v.x).norm();
+						const c1 = nodes[e1.a].p.add(nodes[e1.b].p).mul(0.5);
+						const c2 = nodes[e2.a].p.add(nodes[e2.b].p).mul(0.5);
+						if (axis.dot(c2.sub(c1)) < 0) axis = axis.neg();
+						l = 0;
 					}
-					const forceMag = (minD - l) * 0.02;
-					const v = dir.mul(forceMag);
+
+					const forceMag = (minD - l) * 0.05;
+					const v = axis.mul(forceMag);
 					const sd = 0.5;
-					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
-					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
-					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
-					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
+					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - sc).mul(sd));
+					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(sc).mul(sd));
+					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - tc).mul(sd));
+					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) nodes[e2.b].a = nodes[e2.b].a.add(v.mul(tc).mul(sd));
 				}
 			}
 		}
