@@ -321,7 +321,7 @@ function update() {
 				const d = cp.p2.sub(cp.p1);
 				const minD = nodeDistanceMin;
 				let l = d.len();
-				if (l < minD) {
+				if (l <= minD) {
 					let dir;
 					if (l < 1e-3) {
 						const v1 = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
@@ -333,13 +333,12 @@ function update() {
 						else {
 							dir = dir.left().norm();
 						}
-						l = dir.len();
+						l = 0;
 					}
 					else {
-						dir = d;
+						dir = d.div(l);
 					}
-					dir = dir.div(l);
-					const forceMag = (minD - l) * 0.04;
+					const forceMag = (minD - l) * 0.02;
 					const v = dir.mul(forceMag);
 					const sd = 0.5;
 					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
