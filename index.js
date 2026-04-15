@@ -80,8 +80,12 @@ function onRandom() {
 	const existingEdges = new Set();
 	let lines = "";
 	function addEdgeInternal(a, b) {
-		if (a === b || existingEdges.has(`${a}-${b}`)) return false;
-		if (degree[a] >= 4 || degree[b] >= 4) return false;
+		if (a === b || existingEdges.has(`${a}-${b}`)) {
+      return false;
+    }
+		if (degree[a] >= 4 || degree[b] >= 4) {
+      return false;
+    }
 		existingEdges.add(`${a}-${b}`);
 		degree[a]++;
 		degree[b]++;
@@ -146,7 +150,9 @@ function init() {
 		e.stopPropagation();
 	});
 	displaySvg.addEventListener("touchstart", (e) => {
-		if (e.touches.length != 1) return;
+		if (e.touches.length != 1) {
+      return;
+    }
 		draggingBackground = true;
 		lastX = e.touches[0].clientX;
 		lastY = e.touches[0].clientY;
@@ -166,7 +172,9 @@ function init() {
 		}
 	});
 	window.addEventListener("touchmove", (e) => {
-		if (!draggingBackground || e.touches.length != 1) return;
+		if (!draggingBackground || e.touches.length != 1) {
+      return;
+    }
 		const dx = e.touches[0].clientX - lastX;
 		const dy = e.touches[0].clientY - lastY;
 		lastX = e.touches[0].clientX;
@@ -293,64 +301,36 @@ function update() {
 			const b = e.b;
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len() || 0.001;
-			const rv = nodes[b].v.sub(nodes[a].v);
-			const uD = d.div(l);
-			const damping = uD.mul(rv.dot(uD) * 0.02);
-			const force = d.mul((springDistance / l - 1) * 0.003).sub(damping);
-			nodes[a].a = nodes[a].a.add(force.neg());
-			nodes[b].a = nodes[b].a.add(force);
+			const force = d.mul((springDistance / l - 1) * 0.003);
+			// nodes[a].a = nodes[a].a.add(force.neg());
+			// nodes[b].a = nodes[b].a.add(force);
 		}
 		for (const i in nodes) {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
 			const d = nodes[i].p.sub(center);
 			const force = d.mul(0.0005);
-			nodes[i].a = nodes[i].a.add(force.neg());
+			// nodes[i].a = nodes[i].a.add(force.neg());
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			for (let j = i + 1; j < edgeArray.length; j++) {
-				const e1 = edgeArray[i];
-				const e2 = edgeArray[j];
-				const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
-				const distVec = cp.pB.sub(cp.pA);
-				const l = distVec.len();
-				const minD = nodeDistanceMin;
-				
-				if (l < minD) {
-					// 1. Find the separating axis (Normal or Closest Point Vector)
-					let axis;
-					if (l > 0.1) {
-						axis = distVec.div(l);
-					} else {
-						const e1v = nodes[e1.b].p.sub(nodes[e1.a].p);
-						axis = new Vector(-e1v.y, e1v.x).norm();
-						const c1 = nodes[e1.a].p.add(nodes[e1.b].p).mul(0.5);
-						const c2 = nodes[e2.a].p.add(nodes[e2.b].p).mul(0.5);
-						if (axis.dot(c2.sub(c1)) < 0) axis = axis.neg();
+				const e1 = edgeArray[i], e2 = edgeArray[j];
+				const collision = getCollision(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p, nodeRadius);
+				if (collision) {
+					const sc = collision.sc;
+					const tc = collision.tc;
+					const f = collision.normal.mul(collision.depth * 0.5);
+					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
+						nodes[e1.a].a = nodes[e1.a].a.add(f.mul(1 - sc));
 					}
-					
-					// 2. Determine contact points (sc, tc) by finding the midpoint of the overlap
-					// This creates torque for connected edges and handles all cases (parallel, crossing) robustly.
-					const L1 = nodes[e1.b].p.sub(nodes[e1.a].p).len() || 1;
-					const L2 = nodes[e2.b].p.sub(nodes[e2.a].p).len() || 1;
-					const r_eff = minD / 2;
-					
-					const e1dir = nodes[e1.b].p.sub(nodes[e1.a].p).div(L1);
-					const d3 = nodes[e2.a].p.sub(nodes[e1.a].p).dot(e1dir);
-					const d4 = nodes[e2.b].p.sub(nodes[e1.a].p).dot(e1dir);
-					const sc = (Math.max(0, Math.min(d3, d4) - r_eff) + Math.min(L1, Math.max(d3, d4) + r_eff)) / (2 * L1);
-					
-					const e2dir = nodes[e2.b].p.sub(nodes[e2.a].p).div(L2);
-					const d1 = nodes[e1.a].p.sub(nodes[e2.a].p).dot(e2dir);
-					const d2 = nodes[e1.b].p.sub(nodes[e2.a].p).dot(e2dir);
-					const tc = (Math.max(0, Math.min(d1, d2) - r_eff) + Math.min(L2, Math.max(d1, d2) + r_eff)) / (2 * L2);
-
-					const forceMag = (minD - l) * 0.05;
-					const v = axis.mul(forceMag);
-					const sd = 0.5;
-					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - sc).mul(sd));
-					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(sc).mul(sd));
-					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - tc).mul(sd));
-					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) nodes[e2.b].a = nodes[e2.b].a.add(v.mul(tc).mul(sd));
+					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
+						nodes[e1.b].a = nodes[e1.b].a.add(f.mul(sc));
+					}
+					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
+						nodes[e2.a].a = nodes[e2.a].a.sub(f.mul(1 - tc));
+					}
+					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
+						nodes[e2.b].a = nodes[e2.b].a.sub(f.mul(tc));
+					}
 				}
 			}
 		}
@@ -362,14 +342,18 @@ function update() {
 				if (l < nodeDistanceMin) {
 					const forceMag = (nodeDistanceMin - l) * 0.05;
 					const f = d.mul(forceMag / l);
-					if (!nodes[a].dragging && !nodes[a].fixed) nodes[a].a = nodes[a].a.sub(f);
-					if (!nodes[b].dragging && !nodes[b].fixed) nodes[b].a = nodes[b].a.add(f);
+					if (!nodes[a].dragging && !nodes[a].fixed) {
+            nodes[a].a = nodes[a].a.sub(f);
+          }
+					if (!nodes[b].dragging && !nodes[b].fixed) {
+            nodes[b].a = nodes[b].a.add(f);
+          }
 				}
 			}
 		}
 		for (const i in nodes) {
-			nodes[i].v = nodes[i].v.add(nodes[i].a);
-			nodes[i].v = nodes[i].v.mul(0.9);
+			nodes[i].v = nodes[i].v.add(nodes[i].a.mul(stepSize));
+			nodes[i].v = nodes[i].v.mul(Math.pow(0.9, stepSize));
 			const l = nodes[i].v.len();
 			const limit = nodeRadius * 0.7;
 			if (l > limit) {
@@ -591,40 +575,67 @@ class Vector {
 	}
 }
 
-function getClosestPoints(p1, p2, p3, p4) {
-	const u = p2.sub(p1);
-	const v = p4.sub(p3);
-	const w = p1.sub(p3);
-	const a = u.dot(u);
-	const b = u.dot(v);
-	const c = v.dot(v);
-	const d = u.dot(w);
-	const e = v.dot(w);
-	const D = a * c - b * b;
-	let sc, tc;
-	if (D < 1e-6) {
-		sc = 0.0;
-		tc = (b > c ? d / b : e / c);
-	} else {
-		sc = (b * e - c * d) / D;
-		tc = (a * e - b * d) / D;
-	}
-	if (sc < 0.0) sc = 0.0;
-	else if (sc > 1.0) sc = 1.0;
-	tc = (sc * b + e) / c;
-	if (tc < 0.0) {
-		tc = 0.0;
-		sc = Math.max(0.0, Math.min(1.0, -d / a));
-	} else if (tc > 1.0) {
-		tc = 1.0;
-		sc = Math.max(0.0, Math.min(1.0, (b - d) / a));
-	}
-	return {
-		pA: p1.add(u.mul(sc)),
-		pB: p3.add(v.mul(tc)),
-		s: sc,
-		t: tc
-	};
+function getCollision(p1, p2, p3, p4, radius) {
+    const u = p2.sub(p1); // Vector Edge 1
+    const v = p4.sub(p3); // Vector Edge 2
+    const w = p1.sub(p3);
+
+    const a = u.dot(u);
+    const b = u.dot(v);
+    const c = v.dot(v);
+    const d = u.dot(w);
+    const e = v.dot(w);
+
+    const D = a * c - b * b; // Determinant
+    let sc, tc;
+
+    // 1. Calculate parametric constants sc and tc
+    if (D < 0.000001) { 
+        // Parallel lines: fix sc, solve for tc
+        sc = 0.0;
+        tc = (b > c) ? d / b : e / c;
+    } else {
+        sc = (b * e - c * d) / D;
+        tc = (a * e - b * d) / D;
+    }
+
+    // 2. Clamp to segment boundaries
+    sc = Math.max(0, Math.min(1, sc));
+    tc = Math.max(0, Math.min(1, tc));
+
+    const closestP1 = p1.add(u.mul(sc));
+    const closestP2 = p3.add(v.mul(tc));
+    const diff = closestP1.sub(closestP2);
+    const distanceSq = diff.dot(diff);
+    const minDist = radius * 2;
+
+    if (distanceSq < minDist * minDist) {
+        const distance = Math.sqrt(distanceSq);
+        let normal;
+
+        if (distance > 0.000001) {
+            // Standard normal
+            normal = diff.div(distance);
+        } else {
+            // Shared vertex or exact intersection: 
+            // Generate a normal perpendicular to the plane of the two edges
+            const dir1 = u.norm();
+            const dir2 = v.norm();
+            // 2D Perpendicular fallback
+            const combined = dir1.sub(dir2).norm();
+            normal = new Vector(-combined.y, combined.x);
+        }
+
+        return {
+            sc: sc,
+            tc: tc,
+            normal: normal,
+            depth: minDist - distance,
+            distance: distance
+        };
+    }
+
+    return null;
 }
 
 init();
