@@ -80,7 +80,7 @@ function onRandom() {
 	const existingEdges = new Set();
 	let lines = "";
 	function addEdgeInternal(a, b) {
-		if (a === b || existingEdges.has(`${a}-${b}`) || existingEdges.has(`${b}-${a}`)) return false;
+		if (a === b || existingEdges.has(`${a}-${b}`)) return false;
 		if (degree[a] >= 4 || degree[b] >= 4) return false;
 		existingEdges.add(`${a}-${b}`);
 		degree[a]++;
@@ -258,7 +258,7 @@ function update() {
 	const manualMode = manualInput.checked;
 	const speed = globalSpeed;
 	if (manualMode || speed <= 0) {
-		const minDistance = nodeDistanceMin;
+		const minDistance = nodeRadius * 2;
 		for (const a in nodes) {
 			for (const b in nodes) {
 				if (b <= a) {
