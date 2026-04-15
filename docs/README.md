@@ -7,7 +7,7 @@ Hosted at: https://elgv.netlify.app
 ## Features
 
 *   **Force-Directed Layout**: Nodes respond to spring and repulsion forces, creating organic layouts automatically.
-*   **Entanglement Resolution**: Forces are applied to intersecting edges to separate them for better connection visibility.
+*   **Entanglement Resolution**: Collision forces push intersecting edges apart for better connection visibility.
 *   **Graph Theory Support**: Full support for directed graphs with arrows and weighted edges with numeric labels.
 *   **Real-time Interaction**: Drag individual nodes to rearrange the layout or pan the entire view to navigate large graphs.
 *   **Dynamic Customization**: Adjust visualization parameters on the fly, including node sizing, margins, and edge lengths.
