@@ -38,28 +38,6 @@ function onUpdate() {
 	for (const i in nodes) {
 		nodes[i].gen = 0;
 	}
-	for (const i in nodes) {
-		let s = [];
-		for (const e of edges.values()) {
-			if (e.a == i) {
-				s.push(e.b);
-			}
-			if (e.b == i) {
-				s.push(e.a);
-			}
-		}
-		if (!edgeOrder[i]) {
-			edgeOrder[i] = [];
-		}
-		for (const j of s) {
-			if (edgeOrder[i].includes(j)) {
-				continue;
-			}
-			const targetIndex = randomInt(0, edgeOrder[i].length);
-			edgeOrder[i].splice(targetIndex, 0, j);
-		}
-		edgeOrder[i] = edgeOrder[i].filter(j => s.includes(j));
-	}
 	const lines = edgeListEdit.value.trim().split('\n');
 	for (const line of lines) {
 		const [a, b, w] = line.trim().split(' ').map(Number);
@@ -308,6 +286,13 @@ function update() {
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
 	const edgeArray = Array.from(edges.values());
+	const adj = {};
+	for (const e of edgeArray) {
+		adj[e.a] ??= [];
+		adj[e.a].push(e.b);
+		adj[e.b] ??= [];
+		adj[e.b].push(e.a);
+	}
 	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
 			nodes[i].a = new Vector();
@@ -327,7 +312,49 @@ function update() {
 			const force = d.mul(0.0005);
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
+		function intersectingEdges(e1, e2) {
+			let v1 = nodes[e1.b].p.sub(nodes[e1.a].p);
+			let v2 = nodes[e2.b].p.sub(nodes[e2.a].p);
+			if (v1.lensq() < v2.lensq()) {
+				intersectingEdges(e2, e1);
+				return;
+			}
+			// find which node of e2 is closer to the edge
+			var v = [];
+			function dfs(i) {
+				for (const j of adj[i]) {
+					if (!v[j]) {
+						v[j] = 1e9;
+					}
+					const d = nodes[i].p.sub(nodes[j].p);
+					if (v[i] + d < v[j]) {
+						v[j] = v[i] + d;
+						dfs(j);
+					}
+				}
+			}
+			v[e1.a] = 0;
+			v[e1.b] = 0;
+			v[e2.a] = 1e9;
+			v[e2.b] = 1e9;
+			dfs(e1.a);
+			dfs(e1.b);
+			const f = 0.1;
+			if (v[e2.a] == 1e9 || v[e2.b] != 1e9 && v[e2.a] < v[e2.b]) {
+				const q = closestOnEdge(e2.a, e1);
+				const g = q.sub(nodes[e2.a].p);
+				nodes[e2.a].a = nodes[e2.a].a.add(g.mul(f));
+			}
+			else {
+				const q = closestOnEdge(e2.b, e1);
+				const g = q.sub(nodes[e2.b].p);
+				nodes[e2.b].a = nodes[e2.b].a.add(g.mul(f));
+			}
+		}
 		function collideEdges(e1, e2) {
+			if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
+				return;
+			}
 			const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
 			const d = cp.p2.sub(cp.p1);
 			const minD = nodeDistanceMin;
@@ -335,13 +362,13 @@ function update() {
 			if (l <= minD) {
 				let dir;
 				if (l < 1e-3) {
-					const v1 = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
-					dir = v1.left();
-					l = 0;
+					intersectingEdges(e1, e2);
+					return;
 				}
 				else {
 					dir = d.div(l);
 				}
+				return;
 				const forceMag = (minD - l) * 0.02;
 				const v = dir.mul(forceMag);
 				const sd = 0.5;
@@ -397,6 +424,21 @@ function update() {
 			}
 		}
 	}
+}
+
+function closestOnEdge(i, e) {
+	const p = nodes[i].p;
+	const a = nodes[e.a].p;
+	const b = nodes[e.b].p;
+	const dx = b.x - a.x;
+	const dy = b.y - a.y;
+	const d2 = dx * dx + dy * dy;
+	if (d2 === 0) {
+		new Vector(a.x, a.y);
+	}
+	let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / d2;
+	t = Math.max(0, Math.min(1, t));
+	return new Vector(a.x + t * dx, a.y + t * dy);
 }
 
 function addNode(i) {
