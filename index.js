@@ -318,8 +318,8 @@ function update() {
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len() || 0.001;
 			const force = d.mul((springDistance / l - 1) * 0.003);
-			nodes[a].a = nodes[a].a.add(force.neg());
-			nodes[b].a = nodes[b].a.add(force);
+			// nodes[a].a = nodes[a].a.add(force.neg());
+			// nodes[b].a = nodes[b].a.add(force);
 		}
 		for (const i in nodes) {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
@@ -374,10 +374,10 @@ function update() {
 					const forceMag = (nodeDistanceMin - l) * 0.05;
 					const f = d.mul(forceMag / l);
 					if (!nodes[a].dragging && !nodes[a].fixed) {
-						nodes[a].a = nodes[a].a.sub(f);
+						// nodes[a].a = nodes[a].a.sub(f);
 					}
 					if (!nodes[b].dragging && !nodes[b].fixed) {
-						nodes[b].a = nodes[b].a.add(f);
+						// nodes[b].a = nodes[b].a.add(f);
 					}
 				}
 			}
