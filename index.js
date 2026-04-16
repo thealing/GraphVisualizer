@@ -24,6 +24,8 @@ var nodes = new Map();
 
 var edges = new Map();
 
+var edgeOrder = new Array();
+
 function onGraphSvgResize() {
 	displayWidth = displaySvg.clientWidth || displaySvg.getBoundingClientRect().width;
 	displayHeight = displaySvg.clientHeight || displaySvg.getBoundingClientRect().height;
@@ -35,6 +37,28 @@ function onUpdate() {
 	}
 	for (const i in nodes) {
 		nodes[i].gen = 0;
+	}
+	for (const i in nodes) {
+		let s = [];
+		for (const e of edges.values()) {
+			if (e.a == i) {
+				s.push(e.b);
+			}
+			if (e.b == i) {
+				s.push(e.a);
+			}
+		}
+		if (!edgeOrder[i]) {
+			edgeOrder[i] = [];
+		}
+		for (const j of s) {
+			if (edgeOrder[i].includes(j)) {
+				continue;
+			}
+			const targetIndex = randomInt(0, edgeOrder[i].length);
+			edgeOrder[i].splice(targetIndex, 0, j);
+		}
+		edgeOrder[i] = edgeOrder[i].filter(j => s.includes(j));
 	}
 	const lines = edgeListEdit.value.trim().split('\n');
 	for (const line of lines) {
@@ -71,39 +95,31 @@ function onRefresh() {
 	}
 	nodes = new Map();
 	edges = new Map();
+	edgeOrder = new Array();
 	onUpdate()
 }
 
 function onRandom() {
 	const n = randomInt(4, 12);
-	const degree = new Array(n).fill(0);
-	const existingEdges = new Set();
-	let lines = "";
-	function addEdgeInternal(a, b) {
-		if (a === b || existingEdges.has(`${a}-${b}`)) {
-			return false;
+		let lines = "";
+		const edges = [];
+
+		// To create a tree, we connect each node i to a random node already in the tree
+		for (let i = 1; i < n; i++) {
+				// Pick a random node 'j' that is already part of the connected component
+				const j = randomInt(0, i - 1);
+				const w = randomInt(1, 9);
+				
+				// Randomly flip order so it's not always (low, high)
+				if (Math.random() > 0.5) {
+						lines += `${i} ${j} ${w}\n`;
+				} else {
+						lines += `${j} ${i} ${w}\n`;
+				}
 		}
-		if (degree[a] >= 4 || degree[b] >= 4) {
-			return false;
-		}
-		existingEdges.add(`${a}-${b}`);
-		degree[a]++;
-		degree[b]++;
-		const w = randomInt(1, 9);
-		lines += `${a} ${b} ${w}\n`;
-		return true;
-	}
-	const extraEdges = Math.floor(n * 1.5);
-	let added = 0;
-	while (added < extraEdges) {
-		const a = randomInt(0, n - 1);
-		const b = randomInt(0, n - 1);
-		if (addEdgeInternal(a, b)) {
-			added++;
-		}
-	}
-	edgeListEdit.value = lines;
-	onUpdate();
+
+		edgeListEdit.value = lines;
+		onUpdate();
 }
 
 function onApply() {
@@ -292,9 +308,6 @@ function update() {
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
 	const edgeArray = Array.from(edges.values());
-	for (const i in nodes) {
-		edgeArray.push(new Edge(i, i));
-	}
 	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
 			nodes[i].a = new Vector();
@@ -314,46 +327,42 @@ function update() {
 			const force = d.mul(0.0005);
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
+		function collideEdges(e1, e2) {
+			const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
+			const d = cp.p2.sub(cp.p1);
+			const minD = nodeDistanceMin;
+			let l = d.len();
+			if (l <= minD) {
+				let dir;
+				if (l < 1e-3) {
+					const v1 = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
+					dir = v1.left();
+					l = 0;
+				}
+				else {
+					dir = d.div(l);
+				}
+				const forceMag = (minD - l) * 0.02;
+				const v = dir.mul(forceMag);
+				const sd = 0.5;
+				if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
+					nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
+				}
+				if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
+					nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
+				}
+				if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
+					nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
+				}
+				if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
+					nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
+				}
+			}
+		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e1 = edgeArray[i], e2 = edgeArray[j];
-				const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
-				const d = cp.p2.sub(cp.p1);
-				const minD = nodeDistanceMin;
-				let l = d.len();
-				if (l <= minD) {
-					let dir;
-					if (l < 1e-3) {
-						const v1 = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
-						const v2 = nodes[e2.b].p.sub(nodes[e2.a].p).norm();
-						dir = v1.sub(v2); 
-						if (dir.len() < 1e-3) {
-							dir = v1.left();
-						}
-						else {
-							dir = dir.left().norm();
-						}
-						l = 0;
-					}
-					else {
-						dir = d.div(l);
-					}
-					const forceMag = (minD - l) * 0.02;
-					const v = dir.mul(forceMag);
-					const sd = 0.5;
-					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
-						nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
-					}
-					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
-						nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
-					}
-					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
-						nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
-					}
-					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
-						nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
-					}
-				}
+				collideEdges(e1, e2);
 			}
 		}
 		for (const a in nodes) {
