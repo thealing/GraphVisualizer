@@ -79,25 +79,30 @@ function onRefresh() {
 
 function onRandom() {
 	const n = randomInt(4, 12);
-		let lines = "";
-		const edges = [];
-
-		// To create a tree, we connect each node i to a random node already in the tree
-		for (let i = 1; i < n; i++) {
-				// Pick a random node 'j' that is already part of the connected component
-				const j = randomInt(0, i - 1);
-				const w = randomInt(1, 9);
-				
-				// Randomly flip order so it's not always (low, high)
-				if (Math.random() > 0.5) {
-						lines += `${i} ${j} ${w}\n`;
-				} else {
-						lines += `${j} ${i} ${w}\n`;
-				}
+	const degree = new Array(n).fill(0);
+	const existingEdges = new Set();
+	let lines = "";
+	function addEdgeInternal(a, b) {
+		if (a === b || existingEdges.has(`${a}-${b}`) || existingEdges.has(`${b}-${a}`)) return false;
+		if (degree[a] >= 4 || degree[b] >= 4) return false;
+		existingEdges.add(`${a}-${b}`);
+		degree[a]++;
+		degree[b]++;
+		const w = randomInt(1, 9);
+		lines += `${a} ${b} ${w}\n`;
+		return true;
+	}
+	const extraEdges = Math.floor(n * 1.5);
+	let added = 0;
+	while (added < extraEdges) {
+		const a = randomInt(0, n - 1);
+		const b = randomInt(0, n - 1);
+		if (addEdgeInternal(a, b)) {
+			added++;
 		}
-
-		edgeListEdit.value = lines;
-		onUpdate();
+	}
+	edgeListEdit.value = lines;
+	onRefresh();
 }
 
 function onApply() {
@@ -316,7 +321,8 @@ function update() {
 			let v1 = nodes[e1.b].p.sub(nodes[e1.a].p);
 			let v2 = nodes[e2.b].p.sub(nodes[e2.a].p);
 			if (v1.lensq() < v2.lensq()) {
-				return intersectingEdges(e2, e1, p2, p1).neg();
+				const r = intersectingEdges(e2, e1, p2, p1);
+				return r.neg();
 			}
 			var v = [];
 			function dfs(i) {
@@ -329,7 +335,10 @@ function update() {
 					}
 					const d = nodes[i].p.sub(nodes[j].p).len();
 					if (v[i] + d < v[j]) {
-						v[j] = v[i] + d;
+						const dn = v[i] == 0 && (j == e2.a || j == e2.b);
+						if (!dn) {
+							v[j] = v[i] + d;
+						}
 						dfs(j);
 					}
 				}
@@ -412,9 +421,9 @@ function update() {
 			for (const b in nodes) {
 				if (b <= a) continue;
 				const d = nodes[b].p.sub(nodes[a].p);
-				const l = d.len() || 0.01;
+				const l = d.len() || 1e-3;
 				if (l < nodeDistanceMin) {
-					const forceMag = (nodeDistanceMin - l) * 0.05;
+					const forceMag = (nodeDistanceMin - l) * 0.02;
 					const f = d.mul(forceMag / l);
 					if (!nodes[a].dragging && !nodes[a].fixed) {
 						nodes[a].a = nodes[a].a.sub(f);
