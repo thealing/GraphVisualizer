@@ -324,7 +324,8 @@ function update() {
 				const r = intersectingEdges(e2, e1, p2, p1);
 				return r.neg();
 			}
-			var v = [];
+			let v = [];
+			let la = 0, lb = 0;
 			function dfs(i) {
 				for (const j of adj[i]) {
 					if (i == e2.a && j == e2.b || i == e2.b && j == e2.a) {
@@ -334,22 +335,24 @@ function update() {
 						v[j] = 1e9;
 					}
 					const d = nodes[i].p.sub(nodes[j].p).len();
-					if (v[i] + d < v[j]) {
-						const dn = v[i] == 0 && (j == e2.a || j == e2.b);
-						if (!dn) {
-							v[j] = v[i] + d;
-						}
+					const x = v[i] + d;
+					if (x < v[j]) {
+						v[j] = x;
 						dfs(j);
+					}
+					if (j == e2.a) {
+						la += x;
+					}
+					if (j == e2.b) {
+						lb += x;
 					}
 				}
 			}
 			v[e1.a] = 0;
 			v[e1.b] = 0;
-			v[e2.a] = 1e9;
-			v[e2.b] = 1e9;
 			dfs(e1.a);
 			dfs(e1.b);
-			if (v[e2.a] == 1e9 || v[e2.b] != 1e9 && v[e2.a] < v[e2.b]) {
+			if (la < lb) {
 				return nodes[e2.a].p.sub(p1);
 			}
 			else {
