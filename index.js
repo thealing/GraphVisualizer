@@ -374,10 +374,10 @@ function update() {
 					const forceMag = (nodeDistanceMin - l) * 0.05;
 					const f = d.mul(forceMag / l);
 					if (!nodes[a].dragging && !nodes[a].fixed) {
-						// nodes[a].a = nodes[a].a.sub(f);
+						nodes[a].a = nodes[a].a.sub(f);
 					}
 					if (!nodes[b].dragging && !nodes[b].fixed) {
-						// nodes[b].a = nodes[b].a.add(f);
+						nodes[b].a = nodes[b].a.add(f);
 					}
 				}
 			}
