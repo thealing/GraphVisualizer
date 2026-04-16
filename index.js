@@ -312,21 +312,22 @@ function update() {
 			const force = d.mul(0.0005);
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
-		function intersectingEdges(e1, e2) {
+		function intersectingEdges(e1, e2, p1, p2) {
 			let v1 = nodes[e1.b].p.sub(nodes[e1.a].p);
 			let v2 = nodes[e2.b].p.sub(nodes[e2.a].p);
 			if (v1.lensq() < v2.lensq()) {
-				intersectingEdges(e2, e1);
-				return;
+				return intersectingEdges(e2, e1, p2, p1).neg();
 			}
-			// find which node of e2 is closer to the edge
 			var v = [];
 			function dfs(i) {
 				for (const j of adj[i]) {
+					if (i == e2.a && j == e2.b || i == e2.b && j == e2.a) {
+						continue;
+					}
 					if (!v[j]) {
 						v[j] = 1e9;
 					}
-					const d = nodes[i].p.sub(nodes[j].p);
+					const d = nodes[i].p.sub(nodes[j].p).len();
 					if (v[i] + d < v[j]) {
 						v[j] = v[i] + d;
 						dfs(j);
@@ -339,16 +340,11 @@ function update() {
 			v[e2.b] = 1e9;
 			dfs(e1.a);
 			dfs(e1.b);
-			const f = 0.1;
 			if (v[e2.a] == 1e9 || v[e2.b] != 1e9 && v[e2.a] < v[e2.b]) {
-				const q = closestOnEdge(e2.a, e1);
-				const g = q.sub(nodes[e2.a].p);
-				nodes[e2.a].a = nodes[e2.a].a.add(g.mul(f));
+				return nodes[e2.a].p.sub(p1);
 			}
 			else {
-				const q = closestOnEdge(e2.b, e1);
-				const g = q.sub(nodes[e2.b].p);
-				nodes[e2.b].a = nodes[e2.b].a.add(g.mul(f));
+				return nodes[e2.b].p.sub(p1);
 			}
 		}
 		function collideEdges(e1, e2) {
@@ -360,16 +356,12 @@ function update() {
 			const minD = nodeDistanceMin;
 			let l = d.len();
 			if (l <= minD) {
-				let dir;
+				let dir = intersectingEdges(e1, e2, cp.p1, cp.p2);
 				if (l < 1e-3) {
-					intersectingEdges(e1, e2);
-					return;
+					dir = dir.neg();
 				}
-				else {
-					dir = d.div(l);
-				}
-				return;
-				const forceMag = (minD - l) * 0.02;
+				dir = dir.norm();
+				const forceMag = (minD - l) * 0.05;
 				const v = dir.mul(forceMag);
 				const sd = 0.5;
 				if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
@@ -390,6 +382,30 @@ function update() {
 			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e1 = edgeArray[i], e2 = edgeArray[j];
 				collideEdges(e1, e2);
+			}
+		}
+		for (let i in nodes) {
+			let a = new Set();
+			for (const e of edges.values()) {
+				if (e.a == i) {
+					a.add(e.b);
+				}
+				if (e.b == i) {
+					a.add(e.a);
+				}
+			}
+			const k = new Edge(i, i);
+			for (const e of edges.values()) {
+				let c = 0;
+				if (a.has(e.a)) {
+					c++;
+				}
+				if (a.has(e.b)) {
+					c++;
+				}
+				if (c > 0 && c == a.size) {
+					collideEdges(e, k);
+				}
 			}
 		}
 		for (const a in nodes) {
