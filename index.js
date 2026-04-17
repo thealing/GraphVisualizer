@@ -406,8 +406,8 @@ function update() {
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len() || 0.001;
 			const force = d.mul((springDistance / l - 1) * 0.003);
-			// nodes[a].a = nodes[a].a.add(force.neg());
-			// nodes[b].a = nodes[b].a.add(force);
+			nodes[a].a.minus(force);
+			nodes[b].a.plus(force);
 		}
 		for (const i in nodes) {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
@@ -423,12 +423,8 @@ function update() {
 				return r.neg();
 			}
 			let v = [];
-			let la = 0, lb = 0;
 			function dfs(i) {
 				for (const j of adj[i]) {
-					if (i == e2.a && j == e2.b || i == e2.b && j == e2.a) {
-						continue;
-					}
 					if (!v[j]) {
 						v[j] = 1e9;
 					}
@@ -438,19 +434,15 @@ function update() {
 						v[j] = x;
 						dfs(j);
 					}
-					if (j == e2.a) {
-						la += x;
-					}
-					if (j == e2.b) {
-						lb += x;
-					}
 				}
 			}
 			v[e1.a] = 0;
 			v[e1.b] = 0;
 			dfs(e1.a);
 			dfs(e1.b);
-			if (la < lb) {
+			const distA = v[e2.a] || 1e9;
+			const distB = v[e2.b] || 1e9;
+			if (distA < distB) {
 				return nodes[e2.a].p.sub(p1);
 			}
 			else {
@@ -466,9 +458,8 @@ function update() {
 			const minD = nodeDistanceMin;
 			let l = d.len();
 			if (l <= minD) {
-				if (l > 1e-3 // check for "already solving" neighbors, don't oppose these
-				&& e1.a != e1.b && e2.a != e2.b) { // reentrancy check
-					function doSkip(p, e) { // node has a crossing edge?
+				if (l > 1e-3 && e1.a != e1.b && e2.a != e2.b) {
+					function doSkip(p, e) {
 						let skip = false;
 						for (const c of adj[p]) {
 							if (c == e.a || c == e.b) {
@@ -487,10 +478,10 @@ function update() {
 					let skip2a = doSkip(e2.a, e1);
 					let skip2b = doSkip(e2.b, e1);
 					let skips = skip1a + skip1b + skip2a + skip2b;
-					if (skips >= 2) { // more than 2 already solved - no overlap possible
+					if (skips >= 2) {
 						return;
 					}
-					if (skips == 1) { // 1 solved - solve the other end, to not overlap
+					if (skips == 1) {
 						if (skip1a) {
 							const k = new Edge(e1.b, e1.b);
 							collideEdges(e2, k);
@@ -510,15 +501,14 @@ function update() {
 						return;
 					}
 				}
-				let dir = untangle(e1, e2, cp.p1, cp.p2); // get which node to repel
+				let dir = untangle(e1, e2, cp.p1, cp.p2);
 				if (l < 1e-3) {
-					dir = dir.neg(); // intersecting, so the node is on the other side
+					dir = dir.neg();
 				}
 				dir = dir.norm();
 				const forceMag = (minD - l) * 0.05;
 				const v = dir.mul(forceMag);
 				const sd = 0.5;
-				// apply forces simmetrically
 				if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
 					nodes[e1.a].a.minus(v.mul(1 - cp.s).mul(sd));
 				}
