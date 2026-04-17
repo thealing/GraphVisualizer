@@ -74,8 +74,8 @@ function onRefresh() {
 	onUpdate()
 }
 
-function onRandom() {
-	const n = randomInt(4, 12);
+function onRandom2() {
+	const n = randomInt(100, 100);
 	let lines = "";
 	const edges = [];
 
@@ -97,7 +97,7 @@ function onRandom() {
 	onRefresh();
 }
 
-function onRandom2() {
+function onRandom() {
 	const n = randomInt(4, 12);
 	const degree = new Array(n).fill(0);
 	const existingEdges = new Set();
@@ -215,7 +215,85 @@ function init() {
 	update();
 }
 
+function drawDebugForces() {
+    const svg = document.getElementById("display-svg");
+    if (!svg) return;
+
+    // 1. SELF-INITIALIZE (Setup defs and layer if missing)
+    let layer = document.getElementById("debug-force-layer");
+    if (!layer) {
+        // Create Marker for the Arrow Head
+        if (!document.getElementById("arrow-head-marker")) {
+            const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+            const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+            marker.id = "arrow-head-marker";
+            marker.setAttribute("viewBox", "0 0 10 10");
+            marker.setAttribute("refX", "10"); // Tip of the triangle
+            marker.setAttribute("refY", "5");
+            marker.setAttribute("markerWidth", "6");
+            marker.setAttribute("markerHeight", "6");
+            marker.setAttribute("orient", "auto-start-reverse");
+
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", "M 0 0 L 10 5 L 0 10 z"); // A proper triangle
+            path.setAttribute("fill", "context-stroke"); // Takes color from the line
+
+            marker.appendChild(path);
+            defs.appendChild(marker);
+            svg.appendChild(defs);
+        }
+
+        // Create the Group Layer
+        layer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        layer.id = "debug-force-layer";
+        layer.style.pointerEvents = "none";
+        svg.appendChild(layer);
+    }
+
+    // 2. CLEAR PREVIOUS FRAME
+    layer.replaceChildren();
+
+    // 3. DRAW PROPER SCALED ARROWS
+    const forceScale = 50; // Adjust sensitivity (pixels per unit of force)
+
+    for (let id in nodes) {
+        const node = nodes[id];
+        if (!node.a || !node.a.arr) continue;
+
+        node.a.arr.forEach((v, index) => {
+            // Calculate magnitude
+            const mag = Math.sqrt(v.x * v.x + v.y * v.y);
+            if (mag < 0.001) return; // Skip tiny forces
+
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            
+            // Start at node center
+            line.setAttribute("x1", node.p.x);
+            line.setAttribute("y1", node.p.y);
+            
+            // End at (center + vector * scale)
+            // This ensures the line length is PROPORTIONAL to force magnitude
+            const targetX = node.p.x + v.x * forceScale;
+            const targetY = node.p.y + v.y * forceScale;
+            
+            line.setAttribute("x2", targetX);
+            line.setAttribute("y2", targetY);
+            
+            // Styling
+            // Index 0 (Collision/Untangle) = Red, others = Blue/Green
+            const color = index === 0 ? "#ff3333" : (index === 1 ? "#3333ff" : "#33cc33");
+            line.setAttribute("stroke", color);
+            line.setAttribute("stroke-width", "2");
+            line.setAttribute("marker-end", "url(#arrow-head-marker)");
+            line.setAttribute("opacity", "0.8");
+
+            layer.appendChild(line);
+        });
+    }
+}
+
 function update() {
+	drawDebugForces();
 	drawArrows = directedInput.checked;
 	weightedEdges = weightedInput.checked;
 	requestAnimationFrame(update);
@@ -337,11 +415,11 @@ function update() {
 			const force = d.mul(0.0005);
 			nodes[i].a.plus(force.neg());
 		}
-		function intersectingEdges(e1, e2, p1, p2) {
+		function untangle(e1, e2, p1, p2) {
 			let v1 = nodes[e1.b].p.sub(nodes[e1.a].p);
 			let v2 = nodes[e2.b].p.sub(nodes[e2.a].p);
 			if (v1.lensq() < v2.lensq()) {
-				const r = intersectingEdges(e2, e1, p2, p1);
+				const r = untangle(e2, e1, p2, p1);
 				return r.neg();
 			}
 			let v = [];
@@ -388,14 +466,59 @@ function update() {
 			const minD = nodeDistanceMin;
 			let l = d.len();
 			if (l <= minD) {
-				let dir = intersectingEdges(e1, e2, cp.p1, cp.p2);
+				if (l > 1e-3 // check for "already solving" neighbors, don't oppose these
+				&& e1.a != e1.b && e2.a != e2.b) { // reentrancy check
+					function doSkip(p, e) { // node has a crossing edge?
+						let skip = false;
+						for (const c of adj[p]) {
+							if (c == e.a || c == e.b) {
+								continue;
+							}
+							const cc = getClosestPointsByIndex(c, p, e.a, e.b);
+							if (cc.p2.sub(cc.p1).lensq() < 1e-6) {
+								skip = true;
+								break;
+							}
+						}
+						return skip;
+					}
+					let skip1a = doSkip(e1.a, e2);
+					let skip1b = doSkip(e1.b, e2);
+					let skip2a = doSkip(e2.a, e1);
+					let skip2b = doSkip(e2.b, e1);
+					let skips = skip1a + skip1b + skip2a + skip2b;
+					if (skips >= 2) { // more than 2 already solved - no overlap possible
+						return;
+					}
+					if (skips == 1) { // 1 solved - solve the other end, to not overlap
+						if (skip1a) {
+							const k = new Edge(e1.b, e1.b);
+							collideEdges(e2, k);
+						}
+						if (skip1b) {
+							const k = new Edge(e1.a, e1.a);
+							collideEdges(e2, k);
+						}
+						if (skip2a) {
+							const k = new Edge(e2.b, e2.b);
+							collideEdges(e1, k);
+						}
+						if (skip2b) {
+							const k = new Edge(e2.a, e2.a);
+							collideEdges(e1, k);
+						}
+						return;
+					}
+				}
+				let dir = untangle(e1, e2, cp.p1, cp.p2); // get which node to repel
 				if (l < 1e-3) {
-					dir = dir.neg();
+					dir = dir.neg(); // intersecting, so the node is on the other side
 				}
 				dir = dir.norm();
 				const forceMag = (minD - l) * 0.05;
 				const v = dir.mul(forceMag);
 				const sd = 0.5;
+				// apply forces simmetrically
 				if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
 					nodes[e1.a].a.minus(v.mul(1 - cp.s).mul(sd));
 				}
@@ -694,6 +817,10 @@ class Force extends Vector {
 	minus(v) {
 		this.plus(v.neg());
 	}
+}
+
+function getClosestPointsByIndex(p1, p2, p3, p4) {
+	return getClosestPoints(nodes[p1].p, nodes[p2].p, nodes[p3].p, nodes[p4].p);
 }
 
 function getClosestPoints(p1, p2, p3, p4) {
