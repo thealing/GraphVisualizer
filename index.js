@@ -74,7 +74,7 @@ function onRefresh() {
 	onUpdate()
 }
 
-function onRandom2() {
+function onRandom() {
 	const n = randomInt(100, 100);
 	let lines = "";
 	const edges = [];
@@ -97,7 +97,7 @@ function onRandom2() {
 	onRefresh();
 }
 
-function onRandom() {
+function onRandom2() {
 	const n = randomInt(4, 12);
 	const degree = new Array(n).fill(0);
 	const existingEdges = new Set();
@@ -214,86 +214,7 @@ function init() {
 	onUpdate();
 	update();
 }
-
-function drawDebugForces() {
-    const svg = document.getElementById("display-svg");
-    if (!svg) return;
-
-    // 1. SELF-INITIALIZE (Setup defs and layer if missing)
-    let layer = document.getElementById("debug-force-layer");
-    if (!layer) {
-        // Create Marker for the Arrow Head
-        if (!document.getElementById("arrow-head-marker")) {
-            const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-            const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-            marker.id = "arrow-head-marker";
-            marker.setAttribute("viewBox", "0 0 10 10");
-            marker.setAttribute("refX", "10"); // Tip of the triangle
-            marker.setAttribute("refY", "5");
-            marker.setAttribute("markerWidth", "6");
-            marker.setAttribute("markerHeight", "6");
-            marker.setAttribute("orient", "auto-start-reverse");
-
-            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("d", "M 0 0 L 10 5 L 0 10 z"); // A proper triangle
-            path.setAttribute("fill", "context-stroke"); // Takes color from the line
-
-            marker.appendChild(path);
-            defs.appendChild(marker);
-            svg.appendChild(defs);
-        }
-
-        // Create the Group Layer
-        layer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        layer.id = "debug-force-layer";
-        layer.style.pointerEvents = "none";
-        svg.appendChild(layer);
-    }
-
-    // 2. CLEAR PREVIOUS FRAME
-    layer.replaceChildren();
-
-    // 3. DRAW PROPER SCALED ARROWS
-    const forceScale = 50; // Adjust sensitivity (pixels per unit of force)
-
-    for (let id in nodes) {
-        const node = nodes[id];
-        if (!node.a || !node.a.arr) continue;
-
-        node.a.arr.forEach((v, index) => {
-            // Calculate magnitude
-            const mag = Math.sqrt(v.x * v.x + v.y * v.y);
-            if (mag < 0.001) return; // Skip tiny forces
-
-            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            
-            // Start at node center
-            line.setAttribute("x1", node.p.x);
-            line.setAttribute("y1", node.p.y);
-            
-            // End at (center + vector * scale)
-            // This ensures the line length is PROPORTIONAL to force magnitude
-            const targetX = node.p.x + v.x * forceScale;
-            const targetY = node.p.y + v.y * forceScale;
-            
-            line.setAttribute("x2", targetX);
-            line.setAttribute("y2", targetY);
-            
-            // Styling
-            // Index 0 (Collision/Untangle) = Red, others = Blue/Green
-            const color = index === 0 ? "#ff3333" : (index === 1 ? "#3333ff" : "#33cc33");
-            line.setAttribute("stroke", color);
-            line.setAttribute("stroke-width", "2");
-            line.setAttribute("marker-end", "url(#arrow-head-marker)");
-            line.setAttribute("opacity", "0.8");
-
-            layer.appendChild(line);
-        });
-    }
-}
-
 function update() {
-	drawDebugForces();
 	drawArrows = directedInput.checked;
 	weightedEdges = weightedInput.checked;
 	requestAnimationFrame(update);
@@ -405,7 +326,7 @@ function update() {
 			const b = e.b;
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len() || 0.001;
-			const force = d.mul((springDistance / l - 1) * 0.003);
+			const force = d.mul((springDistance / l - 1) * 0.002);
 			nodes[a].a.minus(force);
 			nodes[b].a.plus(force);
 		}
@@ -423,8 +344,12 @@ function update() {
 				return r.neg();
 			}
 			let v = [];
+			let la = 0, lb = 0;
 			function dfs(i) {
 				for (const j of adj[i]) {
+					if (i == e2.a && j == e2.b || i == e2.b && j == e2.a) {
+						continue;
+					}
 					if (!v[j]) {
 						v[j] = 1e9;
 					}
@@ -434,15 +359,19 @@ function update() {
 						v[j] = x;
 						dfs(j);
 					}
+					if (j == e2.a) {
+						la += x;
+					}
+					if (j == e2.b) {
+						lb += x;
+					}
 				}
 			}
 			v[e1.a] = 0;
 			v[e1.b] = 0;
 			dfs(e1.a);
 			dfs(e1.b);
-			const distA = v[e2.a] || 1e9;
-			const distB = v[e2.b] || 1e9;
-			if (distA < distB) {
+			if (la < lb) {
 				return nodes[e2.a].p.sub(p1);
 			}
 			else {
@@ -506,7 +435,7 @@ function update() {
 					dir = dir.neg();
 				}
 				dir = dir.norm();
-				const forceMag = (minD - l) * 0.05;
+				const forceMag = (minD - l) * 0.08;
 				const v = dir.mul(forceMag);
 				const sd = 0.5;
 				if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
