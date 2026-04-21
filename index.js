@@ -16,6 +16,8 @@ const edgeListEdit = document.getElementById("edge-list-edit");
 
 const displaySvg = document.getElementById("display-svg");
 
+const exampleCountInput = document.getElementById("example-count-input");
+
 var displayWidth = displaySvg.clientWidth;
 
 var displayHeight = displaySvg.clientHeight;
@@ -59,6 +61,87 @@ function onUpdate() {
 			edges.delete(k);
 		}
 	}
+	adj = {};
+	for (const e of edges.values()) {
+		adj[e.a] ??= [];
+		adj[e.a].push(e.b);
+		adj[e.b] ??= [];
+		adj[e.b].push(e.a);
+	}
+	for (const e of edges.values()) {
+		e.nodeSides = {};
+	}
+	if(true)
+	for(let AT=0;AT<100000;AT++) {
+		const pos = {};
+		for (const i in nodes) {
+			pos[i] = getRandomPosition();
+		}
+		let b = false;
+		const edgeArray = Array.from(edges.values());
+		for (let i = 0; i < edgeArray.length && !b; i++) {
+			for (let j = i + 1; j < edgeArray.length && !b; j++) {
+				const e1 = edgeArray[i], e2 = edgeArray[j];
+				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
+					continue;
+				}
+				const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
+				if (cp.p2.sub(cp.p1).len() < 1e-3) {
+					b = true;
+				}
+			}
+		}
+		if (!b) {
+			for (const e of edges.values()) {
+				const v = pos[e.b].sub(pos[e.a]).norm().left();
+				for (const i in nodes) {
+					e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
+				}
+			}
+			return;
+		}
+	}
+	console.log("NOT FOUND BRUTEFROCE");
+	
+	if(false)
+	{
+		const pos = {};
+		let x = 0;
+		function dfs(i, p, y) {
+			pos[i] = new Vector(x, y);
+			// nodes[i].p = new Vector(x, y);
+			for (const j of adj[i]) {
+				if (j == p) {
+					continue;
+				}
+				dfs(j, i, y + 50);
+			}
+			x += 50;
+		}
+		for (const i in nodes) {
+			dfs(i, -1, 0);
+			break;
+		}
+		const edgeArray = Array.from(edges.values());
+		for (let i = 0; i < edgeArray.length; i++) {
+			for (let j = i + 1; j < edgeArray.length; j++) {
+				const e1 = edgeArray[i], e2 = edgeArray[j];
+				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
+					continue;
+				}
+				const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
+				if (cp.p2.sub(cp.p1).len() < 1e-3) {
+					console.log("BAD");
+				}
+			}
+		}
+		for (const e of edges.values()) {
+			const v = pos[e.b].sub(pos[e.a]).norm().left();
+			for (const i in nodes) {
+				e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
+			}
+		}
+	}
 }
 
 function onRefresh() {
@@ -74,8 +157,34 @@ function onRefresh() {
 	onUpdate()
 }
 
+function onRandom2() {
+	let n = randomInt(15, 15);
+	let lines = "";
+	const edges = [];
+	
+	// FIXED
+	n = Number(exampleCountInput.value);
+
+	// To create a tree, we connect each node i to a random node already in the tree
+	for (let i = 1; i < n; i++) {
+			// Pick a random node 'j' that is already part of the connected component
+			const j = randomInt(0, i - 1);
+			const w = randomInt(1, 9);
+			
+			// Randomly flip order so it's not always (low, high)
+			if (Math.random() > 0.5) {
+					lines += `${i} ${j} ${w}\n`;
+			} else {
+					lines += `${j} ${i} ${w}\n`;
+			}
+	}
+
+	edgeListEdit.value = lines;
+	onRefresh();
+}
+
 function onRandom() {
-	const n = randomInt(4, 12);
+	const n = randomInt(12, 12);
 	const degree = new Array(n).fill(0);
 	const existingEdges = new Set();
 	let lines = "";
@@ -241,7 +350,7 @@ function update() {
 		const nx = -dy / len;
 		const ny = dx / len;
 		const halfExtent = Math.abs(nx) * (bbox.width / 2) + Math.abs(ny) * (bbox.height / 2);
-		const offset = halfExtent + springDistance / 100;
+		const offset = halfExtent + nodeRadius / 10;
 		elem.line.setAttribute("x1", start.x);
 		elem.line.setAttribute("y1", start.y);
 		if (drawArrows) {
@@ -312,46 +421,93 @@ function update() {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
 			const d = nodes[i].p.sub(center);
 			const force = d.mul(0.0005);
+			force.x /= displayWidth / displayHeight;
+			force.y *= displayWidth / displayHeight;
 			nodes[i].a = nodes[i].a.add(force.neg());
+		}
+		function getDirection(e, n) {
+			if (!e.nodeSides) {
+				return null;
+			}
+			const v = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
+			const r = e.nodeSides[n];
+			const d = v.dot(nodes[n].p.sub(nodes[e.a].p)) - r * nodeDistanceMin;
+			if (Math.sign(d) == r) {
+				return null;
+			}
+			return v.mul(-d);
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e1 = edgeArray[i], e2 = edgeArray[j];
-				const cp = getClosestPoints(nodes[e1.a].p, nodes[e1.b].p, nodes[e2.a].p, nodes[e2.b].p);
+				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
+					continue;
+				}
+				const cp = getClosestNodePoints(e1.a, e1.b, e2.a, e2.b);
 				const d = cp.p2.sub(cp.p1);
 				const minD = nodeDistanceMin;
 				let l = d.len();
 				if (l <= minD) {
 					let dir;
-					if (l < 1e-3) {
-						const v1 = nodes[e1.b].p.sub(nodes[e1.a].p).norm();
-						const v2 = nodes[e2.b].p.sub(nodes[e2.a].p).norm();
-						dir = v1.sub(v2); 
-						if (dir.len() < 1e-3) {
-							dir = v1.left();
+					function maximize(d) {
+						dir = dir.add(d);
+					}
+					let it = l < 1e-3;
+					if (it) {
+						dir = new Vector();
+						const d1a = getDirection(e2, e1.a);
+						const d1b = getDirection(e2, e1.b);
+						const d2a = getDirection(e1, e2.a);
+						const d2b = getDirection(e1, e2.b);
+						if (d1a) {
+							maximize(d1a);
 						}
-						else {
-							dir = dir.left().norm();
+						if (d1b) {
+							maximize(d1b);
 						}
-						l = 0;
+						if (d2a) {
+							maximize(d2a.neg());
+						}
+						if (d2b) {
+							maximize(d2b.neg());
+						}
 					}
 					else {
 						dir = d.div(l);
+						dir = dir.mul(minD - l);
+						if (l < nodeRadius * 2) {
+													const d1a = getDirection(e2, e1.a);
+						const d1b = getDirection(e2, e1.b);
+						const d2a = getDirection(e1, e2.a);
+						const d2b = getDirection(e1, e2.b);
+						if (d1a && !d1b) {
+							maximize(d1a);
+						}
+						if (d1b && !d1a) {
+							maximize(d1b);
+						}
+						if (d2a && !d2b) {
+							maximize(d2a.neg());
+						}
+						if (d2b && !d2a) {
+							maximize(d2b.neg());
+						}
+						}
 					}
-					const forceMag = (minD - l) * 0.02;
+					const forceMag = 0.02;
 					const v = dir.mul(forceMag);
 					const sd = 0.5;
 					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
-						nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
+						nodes[e1.a].v = nodes[e1.a].v.sub(v.mul(1 - cp.s).mul(sd));
 					}
 					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
-						nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
+						nodes[e1.b].v = nodes[e1.b].v.sub(v.mul(cp.s).mul(sd));
 					}
 					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
-						nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
+						nodes[e2.a].v = nodes[e2.a].v.add(v.mul(1 - cp.t).mul(sd));
 					}
 					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
-						nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
+						nodes[e2.b].v = nodes[e2.b].v.add(v.mul(cp.t).mul(sd));
 					}
 				}
 			}
@@ -362,7 +518,7 @@ function update() {
 				const d = nodes[b].p.sub(nodes[a].p);
 				const l = d.len() || 0.01;
 				if (l < nodeDistanceMin) {
-					const forceMag = (nodeDistanceMin - l) * 0.05;
+					const forceMag = (nodeDistanceMin - l) * 0.04;
 					const f = d.mul(forceMag / l);
 					if (!nodes[a].dragging && !nodes[a].fixed) {
 						nodes[a].a = nodes[a].a.sub(f);
@@ -390,10 +546,62 @@ function update() {
 	}
 }
 
+function getAngle(p, q, r) {
+	const v = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+	return Math.sign(v);
+}
+
+function getNodeAngle(p, q, r) {
+	return getAngle(nodes[p].p, nodes[q].p, nodes[r].p);
+}
+
+function getClosestPoints(p1, p2, p3, p4) {
+	const u = p2.sub(p1);
+	const v = p4.sub(p3);
+	const w = p1.sub(p3);
+	const a = u.dot(u);
+	const b = u.dot(v);
+	const c = v.dot(v);
+	const d = u.dot(w);
+	const e = v.dot(w);
+	const D = a * c - b * b;
+	const E = 1e-6;
+	if (D < E) {
+		const s0 = Math.max(0, Math.min(1, a < E ? 0 : p3.sub(p1).dot(u) / a));
+		const s1 = Math.max(0, Math.min(1, a < E ? 0 : p4.sub(p1).dot(u) / a));
+		const t0 = Math.max(0, Math.min(1, c < E ? 0 : p1.sub(p3).dot(v) / c));
+		const t1 = Math.max(0, Math.min(1, c < E ? 0 : p2.sub(p3).dot(v) / c));
+		s = (s0 + s1) / 2;
+		t = (t0 + t1) / 2;
+	}
+	else {
+		s = (b * e - c * d) / D;
+		t = (a * e - b * d) / D;
+		if (s < 0 || s > 1) {
+			s = Math.max(0, Math.min(1, s));
+			t = (s * b + e) / c;
+		}
+		if (t < 0 || t > 1) {
+			t = Math.max(0, Math.min(1, t));
+			s = Math.max(0, Math.min(1, (t * b - d) / a));
+		}
+	}
+	return { s, t, p1: p1.add(u.mul(s)), p2: p3.add(v.mul(t)) };
+}
+
+function getClosestNodePoints(a, b, c, d) {
+	return getClosestPoints(nodes[a].p, nodes[b].p, nodes[c].p, nodes[d].p);
+}
+
+function getRandomPosition() {
+	const m = displayWidth / 3;
+	return new Vector(randomInt(m, displayWidth - m), randomInt(displayHeight / 3, displayHeight * 2 / 3));
+}
+
 function addNode(i) {
 	if (!nodes[i]) {
-		const m = displayWidth / 3;
-		nodes[i] = new Node(randomInt(m, displayWidth - m), randomInt(displayHeight / 3, displayHeight * 2 / 3), i);
+		const p = getRandomPosition();
+		nodes[i] = new Node(p.x, p.y, i);
 	}
 	nodes[i].gen = 1;
 }
@@ -598,40 +806,5 @@ class Vector {
 		return this.x * v.y - this.y * v.x;
 	}
 }
-
-function getClosestPoints(p1, p2, p3, p4) {
-	const u = p2.sub(p1);
-	const v = p4.sub(p3);
-	const w = p1.sub(p3);
-	const a = u.dot(u);
-	const b = u.dot(v);
-	const c = v.dot(v);
-	const d = u.dot(w);
-	const e = v.dot(w);
-	const D = a * c - b * b;
-	const E = 1e-6;
-	if (D < E) {
-		const s0 = Math.max(0, Math.min(1, a < E ? 0 : p3.sub(p1).dot(u) / a));
-		const s1 = Math.max(0, Math.min(1, a < E ? 0 : p4.sub(p1).dot(u) / a));
-		const t0 = Math.max(0, Math.min(1, c < E ? 0 : p1.sub(p3).dot(v) / c));
-		const t1 = Math.max(0, Math.min(1, c < E ? 0 : p2.sub(p3).dot(v) / c));
-		s = (s0 + s1) / 2;
-		t = (t0 + t1) / 2;
-	}
-	else {
-		s = (b * e - c * d) / D;
-		t = (a * e - b * d) / D;
-		if (s < 0 || s > 1) {
-			s = Math.max(0, Math.min(1, s));
-			t = (s * b + e) / c;
-		}
-		if (t < 0 || t > 1) {
-			t = Math.max(0, Math.min(1, t));
-			s = Math.max(0, Math.min(1, (t * b - d) / a));
-		}
-	}
-	return { s, t, p1: p1.add(u.mul(s)), p2: p3.add(v.mul(t)) };
-}
-
 
 init();

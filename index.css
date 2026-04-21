@@ -94,6 +94,13 @@ body {
 	margin: 0;
 }
 
+#toolbar > label {
+	border: none;
+	align-items: center;
+	font-size: 20px;
+	text-align: center;
+}
+
 #toolbar .input-container * {
 	padding-right: 5px;
 	margin-bottom: var(--control-margin);
