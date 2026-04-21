@@ -10,10 +10,11 @@
 	color: black;
 	accent-color: black;
 	font-family: system-ui;
+	user-select: none;
 
 	--toolbar-width: 280px;
 	--header-height: 50px;
-	--control-height: 31px;
+	--control-height: 30px;
 	--toolbar-padding: 10px;
 	--content-padding: 10px;
 	--control-margin: 10px;
@@ -39,7 +40,7 @@ body {
 	padding-left: 10px;
 	font-size: 30px;
 	border-bottom: solid 1px black;
-	font-family: Verdana;
+	font-family: system-ui;
 }
 
 #layout {
@@ -69,6 +70,7 @@ body {
 	margin-bottom: var(--control-margin);
 	margin-left: var(--control-margin);
 	margin-right: var(--control-margin);
+	padding-bottom: 1px;
 	font-size: 16px;
 }
 
@@ -157,10 +159,6 @@ body {
 	height: 100%;
 	border: solid 1px black;
 	display: block;
-}
-
-text {
-	user-select: none;
 }
 
 select {
