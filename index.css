@@ -162,3 +162,7 @@ body {
 text {
 	user-select: none;
 }
+
+select {
+	padding-left: 3px;
+}
