@@ -405,7 +405,7 @@ function update() {
 	const stepSize = dt / subSteps;
 	const edgeArray = Array.from(edges.values());
 	for (const i in nodes) {
-		// edgeArray.push(new Edge(i, i));
+		edgeArray.push(new Edge(i, i));
 	}
 	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
@@ -432,17 +432,18 @@ function update() {
 			if (!e.nodeSides) {
 				return null;
 			}
-			const r = e.nodeSides[n];
 			const v = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
+			const r = e.nodeSides[n];
 			const d = v.dot(nodes[n].p.sub(nodes[e.a].p));
 			if (Math.sign(d) == r) {
 				return null;
 			}
-			return v.mul(d);
+			return v.mul(-d);
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
+			const e1 = edgeArray[i]
 			for (let j = i + 1; j < edgeArray.length; j++) {
-				const e1 = edgeArray[i], e2 = edgeArray[j];
+				const e2 = edgeArray[j];
 				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
 					continue;
 				}
@@ -453,7 +454,7 @@ function update() {
 				if (l <= minD) {
 					let dir;
 					function maximize(d) {
-						dir = dir.sub(d);
+						dir = dir.add(d);
 					}
 					if (l < 1e-3) {
 						dir = new Vector();
@@ -492,23 +493,6 @@ function update() {
 					}
 					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
 						nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
-					}
-				}
-			}
-		}
-		for (const a in nodes) {
-			for (const b in nodes) {
-				if (b <= a) continue;
-				const d = nodes[b].p.sub(nodes[a].p);
-				const l = d.len() || 0.01;
-				if (l < nodeDistanceMin) {
-					const m = (nodeDistanceMin - l) * 0.04;
-					const f = d.mul(m / l);
-					if (!nodes[a].dragging && !nodes[a].fixed) {
-						nodes[a].a = nodes[a].a.sub(f);
-					}
-					if (!nodes[b].dragging && !nodes[b].fixed) {
-						nodes[b].a = nodes[b].a.add(f);
 					}
 				}
 			}
