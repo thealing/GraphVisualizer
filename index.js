@@ -432,14 +432,13 @@ function update() {
 			if (!e.nodeSides) {
 				return null;
 			}
-			const v = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 			const r = e.nodeSides[n];
+			const v = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 			const d = v.dot(nodes[n].p.sub(nodes[e.a].p));
-			if (Math.sign(d) != -r) {
+			if (Math.sign(d) == r) {
 				return null;
 			}
-			// console.log(e.a+' '+e.b+' : '+n+' | '+Math.abs(d));
-			return v.mul(-d);
+			return v.mul(d);
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			for (let j = i + 1; j < edgeArray.length; j++) {
@@ -454,7 +453,7 @@ function update() {
 				if (l <= minD) {
 					let dir;
 					function maximize(d) {
-						dir = dir.add(d);
+						dir = dir.sub(d);
 					}
 					if (l < 1e-3) {
 						dir = new Vector();
