@@ -29,7 +29,6 @@
 				<textarea id="edge-list-edit" placeholder="Edge list goes here"></textarea>
 				<button onclick="onUpdate()">Update</button>
 				<button onclick="onRefresh()">Refresh</button>
-				<button onclick="onRandom()">Random</button>
 				<div class="separator"></div>
 				<div class="input-container">
 					<label id="speed-label">Simulation Speed</label>
@@ -37,6 +36,19 @@
 					<label id="manual-label">Manual Mode</label>
 					<input id="manual-input" type="checkbox" />
 				</div>
+				<div class="separator"></div>
+				<label id="example-label">Random Example</label>
+				<div class="input-container">
+					<label id="example-count-label">Node Count</label>
+					<input id="example-count-input" type="number" value="16" step="4" />
+					<label id="example-type-label">Graph Type</label>
+					<select id="example-type-input">
+						<option value="any">Any</option>
+						<option value="planar">Planar</option>
+						<option value="tree">Tree</option>
+					</select>
+				</div>
+				<button onclick="onRandom()">Generate</button>
 			</div>
 		</div>
 	</div>

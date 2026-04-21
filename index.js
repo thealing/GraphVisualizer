@@ -16,6 +16,8 @@ const edgeListEdit = document.getElementById("edge-list-edit");
 
 const displaySvg = document.getElementById("display-svg");
 
+const exampleCountInput = document.getElementById("example-count-input");
+
 var displayWidth = displaySvg.clientWidth;
 
 var displayHeight = displaySvg.clientHeight;
@@ -66,7 +68,11 @@ function onUpdate() {
 		adj[e.b] ??= [];
 		adj[e.b].push(e.a);
 	}
-	for(let AT=0;AT<1000000;AT++) {
+	for (const e of edges.values()) {
+		e.nodeSides = {};
+	}
+	if(true)
+	for(let AT=0;AT<100000;AT++) {
 		const pos = {};
 		for (const i in nodes) {
 			pos[i] = getRandomPosition();
@@ -87,13 +93,53 @@ function onUpdate() {
 		}
 		if (!b) {
 			for (const e of edges.values()) {
-				e.nodeSides = {};
 				const v = pos[e.b].sub(pos[e.a]).norm().left();
 				for (const i in nodes) {
 					e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
 				}
 			}
+			return;
+		}
+	}
+	console.log("NOT FOUND BRUTEFROCE");
+	
+	if(false)
+	{
+		const pos = {};
+		let x = 0;
+		function dfs(i, p, y) {
+			pos[i] = new Vector(x, y);
+			// nodes[i].p = new Vector(x, y);
+			for (const j of adj[i]) {
+				if (j == p) {
+					continue;
+				}
+				dfs(j, i, y + 50);
+			}
+			x += 50;
+		}
+		for (const i in nodes) {
+			dfs(i, -1, 0);
 			break;
+		}
+		const edgeArray = Array.from(edges.values());
+		for (let i = 0; i < edgeArray.length; i++) {
+			for (let j = i + 1; j < edgeArray.length; j++) {
+				const e1 = edgeArray[i], e2 = edgeArray[j];
+				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
+					continue;
+				}
+				const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
+				if (cp.p2.sub(cp.p1).len() < 1e-3) {
+					console.log("BAD");
+				}
+			}
+		}
+		for (const e of edges.values()) {
+			const v = pos[e.b].sub(pos[e.a]).norm().left();
+			for (const i in nodes) {
+				e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
+			}
 		}
 	}
 }
@@ -117,7 +163,7 @@ function onRandom2() {
 	const edges = [];
 	
 	// FIXED
-	// n = 100;
+	n = Number(exampleCountInput.value);
 
 	// To create a tree, we connect each node i to a random node already in the tree
 	for (let i = 1; i < n; i++) {
@@ -138,7 +184,7 @@ function onRandom2() {
 }
 
 function onRandom() {
-	const n = randomInt(10, 10);
+	const n = randomInt(12, 12);
 	const degree = new Array(n).fill(0);
 	const existingEdges = new Set();
 	let lines = "";
@@ -304,7 +350,7 @@ function update() {
 		const nx = -dy / len;
 		const ny = dx / len;
 		const halfExtent = Math.abs(nx) * (bbox.width / 2) + Math.abs(ny) * (bbox.height / 2);
-		const offset = halfExtent + springDistance / 100;
+		const offset = halfExtent + nodeRadius / 10;
 		elem.line.setAttribute("x1", start.x);
 		elem.line.setAttribute("y1", start.y);
 		if (drawArrows) {
@@ -368,69 +414,87 @@ function update() {
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len() || 0.001;
 			const force = d.mul((springDistance / l - 1) * 0.003);
-			// nodes[a].a = nodes[a].a.add(force.neg());
-			// nodes[b].a = nodes[b].a.add(force);
+			nodes[a].a = nodes[a].a.add(force.neg());
+			nodes[b].a = nodes[b].a.add(force);
 		}
 		for (const i in nodes) {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
 			const d = nodes[i].p.sub(center);
 			const force = d.mul(0.0005);
+			force.x /= displayWidth / displayHeight;
+			force.y *= displayWidth / displayHeight;
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
 		function getDirection(e, n) {
-			const v = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
-			return v.mul(e.nodeSides ? e.nodeSides[n] : 0);
-		}
-		function getDirection2(e, n) {
-			let centroid = nodes[n].p;
-			for (const j of adj[n]) {
-				centroid = centroid.add(nodes[j].p);
+			if (!e.nodeSides) {
+				return null;
 			}
-			centroid = centroid.div(adj[n].length + 1);
 			const v = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
-			const c = v.dot(nodes[e.a].p);
-			const l = Math.sign(v.dot(centroid) - c);
-			const d = v.dot(nodes[n].p) - c - l * nodeDistanceMin;
-			if (Math.sign(d) == l) {
-				return new Vector();
+			const r = e.nodeSides[n];
+			const d = v.dot(nodes[n].p.sub(nodes[e.a].p)) - r * nodeDistanceMin;
+			if (Math.sign(d) == r) {
+				return null;
 			}
-			return v.mul(d);
+			return v.mul(-d);
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e1 = edgeArray[i], e2 = edgeArray[j];
+				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
+					continue;
+				}
 				const cp = getClosestNodePoints(e1.a, e1.b, e2.a, e2.b);
 				const d = cp.p2.sub(cp.p1);
 				const minD = nodeDistanceMin;
 				let l = d.len();
 				if (l <= minD) {
 					let dir;
-					if (l < 1e-3) {
-						dir = new Vector();
-					}
-					else {
-						dir = d.div(l);
-					}
 					function maximize(d) {
 						dir = dir.add(d);
 					}
-					const d1a = getDirection(e2, e1.a, e1.b);
-					const d1b = getDirection(e2, e1.b, e1.a);
-					const d2a = getDirection(e1, e2.a, e2.b);
-					const d2b = getDirection(e1, e2.b, e2.a);
-					if (d1a) {
-						maximize(d1a);
+					let it = l < 1e-3;
+					if (it) {
+						dir = new Vector();
+						const d1a = getDirection(e2, e1.a);
+						const d1b = getDirection(e2, e1.b);
+						const d2a = getDirection(e1, e2.a);
+						const d2b = getDirection(e1, e2.b);
+						if (d1a) {
+							maximize(d1a);
+						}
+						if (d1b) {
+							maximize(d1b);
+						}
+						if (d2a) {
+							maximize(d2a.neg());
+						}
+						if (d2b) {
+							maximize(d2b.neg());
+						}
 					}
-					if (d1b) {
-						maximize(d1b);
+					else {
+						dir = d.div(l);
+						dir = dir.mul(minD - l);
+						if (l < nodeRadius * 2) {
+													const d1a = getDirection(e2, e1.a);
+						const d1b = getDirection(e2, e1.b);
+						const d2a = getDirection(e1, e2.a);
+						const d2b = getDirection(e1, e2.b);
+						if (d1a && !d1b) {
+							maximize(d1a);
+						}
+						if (d1b && !d1a) {
+							maximize(d1b);
+						}
+						if (d2a && !d2b) {
+							maximize(d2a.neg());
+						}
+						if (d2b && !d2a) {
+							maximize(d2b.neg());
+						}
+						}
 					}
-					if (d2a) {
-						maximize(d2a.neg());
-					}
-					if (d2b) {
-						maximize(d2b.neg());
-					}
-					const forceMag = (minD - l) * 0.08;
+					const forceMag = 0.02;
 					const v = dir.mul(forceMag);
 					const sd = 0.5;
 					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
@@ -480,10 +544,6 @@ function update() {
 			}
 		}
 	}
-}
-
-function sideMapKey(e, i) {
-	return e.a + '-' + e.b + ',' + i;
 }
 
 function getAngle(p, q, r) {
