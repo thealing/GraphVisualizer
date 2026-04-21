@@ -71,39 +71,41 @@ function onUpdate() {
 	for (const e of edges.values()) {
 		e.nodeSides = {};
 	}
-	if(true)
-	for(let AT=0;AT<100000;AT++) {
-		const pos = {};
-		for (const i in nodes) {
-			pos[i] = getRandomPosition();
-		}
-		let b = false;
-		const edgeArray = Array.from(edges.values());
-		for (let i = 0; i < edgeArray.length && !b; i++) {
-			for (let j = i + 1; j < edgeArray.length && !b; j++) {
-				const e1 = edgeArray[i], e2 = edgeArray[j];
-				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
-					continue;
-				}
-				const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
-				if (cp.p2.sub(cp.p1).len() < 1e-3) {
-					b = true;
-				}
-			}
-		}
-		if (!b) {
-			for (const e of edges.values()) {
-				const v = pos[e.b].sub(pos[e.a]).norm().left();
-				for (const i in nodes) {
-					e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
-				}
-			}
-			return;
-		}
-	}
-	console.log("NOT FOUND BRUTEFROCE");
-	
 	if(false)
+	{
+		for(let AT=0;AT<100000;AT++) {
+			const pos = {};
+			for (const i in nodes) {
+				pos[i] = getRandomPosition();
+			}
+			let b = false;
+			const edgeArray = Array.from(edges.values());
+			for (let i = 0; i < edgeArray.length && !b; i++) {
+				for (let j = i + 1; j < edgeArray.length && !b; j++) {
+					const e1 = edgeArray[i], e2 = edgeArray[j];
+					if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
+						continue;
+					}
+					const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
+					if (cp.p2.sub(cp.p1).len() < 1e-3) {
+						b = true;
+					}
+				}
+			}
+			if (!b) {
+				for (const e of edges.values()) {
+					const v = pos[e.b].sub(pos[e.a]).norm().left();
+					for (const i in nodes) {
+						e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
+					}
+				}
+				return;
+			}
+		}
+		console.log("NOT FOUND BRUTEFROCE");
+	}
+	
+	if(true)
 	{
 		const pos = {};
 		let x = 0;
@@ -138,7 +140,8 @@ function onUpdate() {
 		for (const e of edges.values()) {
 			const v = pos[e.b].sub(pos[e.a]).norm().left();
 			for (const i in nodes) {
-				e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
+				const d = v.dot(pos[i].sub(pos[e.a]));
+				e.nodeSides[i] = Math.sign(d) <= 0 ? -1 : 1;
 			}
 		}
 	}
@@ -157,7 +160,7 @@ function onRefresh() {
 	onUpdate()
 }
 
-function onRandom2() {
+function onRandom() {
 	let n = randomInt(15, 15);
 	let lines = "";
 	const edges = [];
@@ -183,7 +186,7 @@ function onRandom2() {
 	onRefresh();
 }
 
-function onRandom() {
+function onRandom2() {
 	const n = randomInt(12, 12);
 	const degree = new Array(n).fill(0);
 	const existingEdges = new Set();
@@ -212,7 +215,7 @@ function onRandom() {
 		}
 	}
 	edgeListEdit.value = lines;
-	onUpdate();
+	onRefresh();
 }
 
 function onApply() {
@@ -402,7 +405,7 @@ function update() {
 	const stepSize = dt / subSteps;
 	const edgeArray = Array.from(edges.values());
 	for (const i in nodes) {
-		edgeArray.push(new Edge(i, i));
+		// edgeArray.push(new Edge(i, i));
 	}
 	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
@@ -431,10 +434,11 @@ function update() {
 			}
 			const v = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 			const r = e.nodeSides[n];
-			const d = v.dot(nodes[n].p.sub(nodes[e.a].p)) - r * nodeDistanceMin;
-			if (Math.sign(d) == r) {
+			const d = v.dot(nodes[n].p.sub(nodes[e.a].p));
+			if (Math.sign(d) != -r) {
 				return null;
 			}
+			// console.log(e.a+' '+e.b+' : '+n+' | '+Math.abs(d));
 			return v.mul(-d);
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
@@ -446,14 +450,13 @@ function update() {
 				const cp = getClosestNodePoints(e1.a, e1.b, e2.a, e2.b);
 				const d = cp.p2.sub(cp.p1);
 				const minD = nodeDistanceMin;
-				let l = d.len();
+				const l = d.len();
 				if (l <= minD) {
 					let dir;
 					function maximize(d) {
 						dir = dir.add(d);
 					}
-					let it = l < 1e-3;
-					if (it) {
+					if (l < 1e-3) {
 						dir = new Vector();
 						const d1a = getDirection(e2, e1.a);
 						const d1b = getDirection(e2, e1.b);
@@ -475,39 +478,21 @@ function update() {
 					else {
 						dir = d.div(l);
 						dir = dir.mul(minD - l);
-						if (l < nodeRadius * 2) {
-													const d1a = getDirection(e2, e1.a);
-						const d1b = getDirection(e2, e1.b);
-						const d2a = getDirection(e1, e2.a);
-						const d2b = getDirection(e1, e2.b);
-						if (d1a && !d1b) {
-							maximize(d1a);
-						}
-						if (d1b && !d1a) {
-							maximize(d1b);
-						}
-						if (d2a && !d2b) {
-							maximize(d2a.neg());
-						}
-						if (d2b && !d2a) {
-							maximize(d2b.neg());
-						}
-						}
 					}
-					const forceMag = 0.02;
-					const v = dir.mul(forceMag);
+					const m = 0.06;
+					const v = dir.mul(m);
 					const sd = 0.5;
 					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
-						nodes[e1.a].v = nodes[e1.a].v.sub(v.mul(1 - cp.s).mul(sd));
+						nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
 					}
 					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
-						nodes[e1.b].v = nodes[e1.b].v.sub(v.mul(cp.s).mul(sd));
+						nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
 					}
 					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
-						nodes[e2.a].v = nodes[e2.a].v.add(v.mul(1 - cp.t).mul(sd));
+						nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
 					}
 					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
-						nodes[e2.b].v = nodes[e2.b].v.add(v.mul(cp.t).mul(sd));
+						nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
 					}
 				}
 			}
@@ -518,8 +503,8 @@ function update() {
 				const d = nodes[b].p.sub(nodes[a].p);
 				const l = d.len() || 0.01;
 				if (l < nodeDistanceMin) {
-					const forceMag = (nodeDistanceMin - l) * 0.04;
-					const f = d.mul(forceMag / l);
+					const m = (nodeDistanceMin - l) * 0.04;
+					const f = d.mul(m / l);
 					if (!nodes[a].dragging && !nodes[a].fixed) {
 						nodes[a].a = nodes[a].a.sub(f);
 					}
@@ -531,7 +516,7 @@ function update() {
 		}
 		for (const i in nodes) {
 			nodes[i].v = nodes[i].v.add(nodes[i].a.mul(stepSize));
-			nodes[i].v = nodes[i].v.mul(Math.pow(0.9, stepSize));
+			nodes[i].v = nodes[i].v.mul(Math.pow(0.95, stepSize));
 			const l = nodes[i].v.len();
 			const limit = nodeRadius * 0.7;
 			if (l > limit) {
@@ -544,15 +529,6 @@ function update() {
 			}
 		}
 	}
-}
-
-function getAngle(p, q, r) {
-	const v = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
-	return Math.sign(v);
-}
-
-function getNodeAngle(p, q, r) {
-	return getAngle(nodes[p].p, nodes[q].p, nodes[r].p);
 }
 
 function getClosestPoints(p1, p2, p3, p4) {
