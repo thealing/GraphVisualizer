@@ -71,80 +71,7 @@ function onUpdate() {
 	for (const e of edges.values()) {
 		e.nodeSides = {};
 	}
-	if(false)
-	{
-		for(let AT=0;AT<100000;AT++) {
-			const pos = {};
-			for (const i in nodes) {
-				pos[i] = getRandomPosition();
-			}
-			let b = false;
-			const edgeArray = Array.from(edges.values());
-			for (let i = 0; i < edgeArray.length && !b; i++) {
-				for (let j = i + 1; j < edgeArray.length && !b; j++) {
-					const e1 = edgeArray[i], e2 = edgeArray[j];
-					if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
-						continue;
-					}
-					const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
-					if (cp.p2.sub(cp.p1).len() < 1e-3) {
-						b = true;
-					}
-				}
-			}
-			if (!b) {
-				for (const e of edges.values()) {
-					const v = pos[e.b].sub(pos[e.a]).norm().left();
-					for (const i in nodes) {
-						e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
-					}
-				}
-				return;
-			}
-		}
-		console.log("NOT FOUND BRUTEFROCE");
-	}
-	
-	if(true)
-	{
-		const pos = {};
-		let x = 0;
-		function dfs(i, p, y) {
-			pos[i] = new Vector(x, y);
-			// nodes[i].p = new Vector(x, y);
-			for (const j of adj[i]) {
-				if (j == p) {
-					continue;
-				}
-				dfs(j, i, y + 50);
-			}
-			x += 50;
-		}
-		for (const i in nodes) {
-			dfs(i, -1, 0);
-			break;
-		}
-		const edgeArray = Array.from(edges.values());
-		for (let i = 0; i < edgeArray.length; i++) {
-			for (let j = i + 1; j < edgeArray.length; j++) {
-				const e1 = edgeArray[i], e2 = edgeArray[j];
-				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
-					continue;
-				}
-				const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
-				if (cp.p2.sub(cp.p1).len() < 1e-3) {
-					console.log("BAD");
-				}
-			}
-		}
-		for (const e of edges.values()) {
-			const v = pos[e.b].sub(pos[e.a]).norm().left();
-			for (const i in nodes) {
-				const d = v.dot(pos[i].sub(pos[e.a]));
-				e.nodeSides[i] = Math.sign(d) <= 0 ? -1 : 1;
-			}
-		}
-	}
+	updateNodeSides();
 }
 
 function onRefresh() {
@@ -161,36 +88,21 @@ function onRefresh() {
 }
 
 function onRandom() {
-	let n = randomInt(15, 15);
-	let lines = "";
-	const edges = [];
-	
-	// FIXED
-	n = Number(exampleCountInput.value);
+    const n = Number(document.getElementById('example-count-input').value);
+    const type = document.getElementById('example-type-input').value;
+    let lines = "";
 
-	// To create a tree, we connect each node i to a random node already in the tree
-	for (let i = 1; i < n; i++) {
-			// Pick a random node 'j' that is already part of the connected component
-			const j = randomInt(0, i - 1);
-			const w = randomInt(1, 9);
-			
-			// Randomly flip order so it's not always (low, high)
-			if (Math.random() > 0.5) {
-					lines += `${i} ${j} ${w}\n`;
-			} else {
-					lines += `${j} ${i} ${w}\n`;
-			}
-	}
-
-	edgeListEdit.value = lines;
-	onRefresh();
-}
-
-function onRandom2() {
-	const n = randomInt(12, 12);
+    for (let i = 1; i < n; i++) {
+            const j = Math.floor(Math.random() * i);
+            const w = Math.floor(Math.random() * 9) + 1;
+            lines += Math.random() > 0.5 ? `${i} ${j} ${w}\n` : `${j} ${i} ${w}\n`;
+        }
+				
+				
+			//	const n = randomInt(10,10);
 	const degree = new Array(n).fill(0);
 	const existingEdges = new Set();
-	let lines = "";
+	 lines = "";
 	function addEdgeInternal(a, b) {
 		if (a === b || existingEdges.has(`${a}-${b}`)) {
 			return false;
@@ -216,6 +128,9 @@ function onRandom2() {
 	}
 	edgeListEdit.value = lines;
 	onRefresh();
+
+    document.getElementById('edge-list-edit').value = lines;
+    onRefresh();
 }
 
 function onApply() {
@@ -404,6 +319,7 @@ function update() {
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
 	const edgeArray = Array.from(edges.values());
+	const edgeCount = edgeArray.length;
 	for (const i in nodes) {
 		edgeArray.push(new Edge(i, i));
 	}
@@ -416,7 +332,7 @@ function update() {
 			const b = e.b;
 			const d = nodes[b].p.sub(nodes[a].p);
 			const l = d.len() || 0.001;
-			const force = d.mul((springDistance / l - 1) * 0.003);
+			const force = d.mul((springDistance / l - 1) * 0.004);
 			nodes[a].a = nodes[a].a.add(force.neg());
 			nodes[b].a = nodes[b].a.add(force);
 		}
@@ -435,14 +351,15 @@ function update() {
 			const v = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 			const r = e.nodeSides[n];
 			const d = v.dot(nodes[n].p.sub(nodes[e.a].p));
-			if (Math.sign(d) == r) {
+			if (Math.sign(d) != -r) {
 				return null;
 			}
 			return v.mul(-d);
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e1 = edgeArray[i]
-			for (let j = i + 1; j < edgeArray.length; j++) {
+			const endIndex = i >= edgeCount ? edgeCount : edgeArray.length;
+			for (let j = i + 1; j < endIndex; j++) {
 				const e2 = edgeArray[j];
 				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
 					continue;
@@ -462,16 +379,16 @@ function update() {
 						const d1b = getDirection(e2, e1.b);
 						const d2a = getDirection(e1, e2.a);
 						const d2b = getDirection(e1, e2.b);
-						if (d1a) {
+						if (d1a && !d1b) {
 							maximize(d1a);
 						}
-						if (d1b) {
+						if (d1b && !d1a) {
 							maximize(d1b);
 						}
-						if (d2a) {
+						if (d2a && !d2b) {
 							maximize(d2a.neg());
 						}
-						if (d2b) {
+						if (d2b && !d2a) {
 							maximize(d2b.neg());
 						}
 					}
@@ -481,7 +398,7 @@ function update() {
 					}
 					const m = 0.06;
 					const v = dir.mul(m);
-					const sd = 0.5;
+					let sd = 0.5;
 					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
 						nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
 					}
@@ -512,6 +429,99 @@ function update() {
 			}
 		}
 	}
+}
+
+function updateNodeSides() {
+	const nodeIndices = [];
+	for (const i in nodes) {
+		nodeIndices.push(Number(i));
+	}
+	const edgeArrays = [];
+	for (const e of edges.values()) {
+		const a = {};
+		a[0] = e.a;
+		a[1] = e.b;
+		edgeArrays.push(a);
+	}
+	const map = getGlobalEdgeNodeSideArray(nodeIndices, edgeArrays);
+	const es = Array.from(edges.values());
+	for (let i = 0; i < es.length; i++) {
+		es[i].nodeSides = map[i].sides;
+	}
+}
+
+/**
+ * Returns an array of objects for each edge.
+ * Each object contains the edge pair and a 'sides' object mapping EVERY node to -1, 0, or 1.
+ */
+function getGlobalEdgeNodeSideArray(nodes, edges) {
+    const n = nodes.length;
+    const adj = [];
+    
+    // 1. Deterministic sort of edges and adjacency lists
+    const sortedEdges = edges
+        .map(e => (e[0] < e[1] ? [e[0], e[1]] : [e[1], e[0]]))
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+    for (const [u, v] of sortedEdges) {
+			adj[u]??=[];
+			adj[v]??=[];
+        adj[u].push(v);
+        adj[v].push(u);
+    }
+    for (let i = 0; i < n; i++) adj[i].sort((a, b) => a - b);
+
+    const dfn = new Array(n).fill(-1);
+    const subtree = Array.from({ length: n }, () => new Set());
+    let timer = 0;
+
+    // 2. Build DFS tree to establish "Inside/Outside" hierarchy
+    function buildTree(u, p = -1) {
+        dfn[u] = timer++;
+        subtree[u].add(u);
+        for (const v of adj[u]) {
+            if (v === p) continue;
+            if (dfn[v] === -1) {
+                buildTree(v, u);
+                // Child's subtree is part of parent's subtree
+                subtree[v].forEach(node => subtree[u].add(node));
+            }
+        }
+    }
+
+    for (let i = 0; i < n; i++) {
+        if (dfn[i] === -1) buildTree(i);
+    }
+
+    // 3. Generate the array of objects
+    return sortedEdges.map(([u, v]) => {
+        const sides = {};
+        
+        // Ensure parent/child order based on DFS traversal
+        const [parent, child] = dfn[u] < dfn[v] ? [u, v] : [v, u];
+        
+        // Deterministic 'preferred' side based on child's rank among its siblings
+        const siblings = adj[parent].filter(node => dfn[node] > dfn[parent]);
+        const childRank = siblings.indexOf(child);
+        const sideVal = (childRank % 2 === 0) ? 1 : -1;
+
+        for (let i = 0; i < n; i++) {
+            if (i === u || i === v) {
+                sides[i] = 0; 
+            } else if (subtree[child].has(i)) {
+                // Nodes in the child's branch get the preferred side
+                sides[i] = sideVal;
+            } else {
+                // All other nodes in the graph (ancestors/other branches) get the opposite
+                sides[i] = -sideVal;
+            }
+        }
+
+        return {
+            edge: [u, v],
+            sides: sides
+        };
+    });
 }
 
 function getClosestPoints(p1, p2, p3, p4) {
