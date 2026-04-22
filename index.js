@@ -68,10 +68,6 @@ function onUpdate() {
 		adj[e.b] ??= [];
 		adj[e.b].push(e.a);
 	}
-	for (const e of edges.values()) {
-		e.nodeSides = {};
-	}
-	updateNodeSides();
 }
 
 function onRefresh() {
@@ -323,6 +319,9 @@ function update() {
 	for (const i in nodes) {
 		edgeArray.push(new Edge(i, i));
 	}
+	for (const i in nodes) {
+		nodes[i].contactEdges = new Set();
+	}
 	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
 			nodes[i].a = new Vector();
@@ -344,18 +343,9 @@ function update() {
 			force.y *= displayWidth / displayHeight;
 			nodes[i].a = nodes[i].a.add(force.neg());
 		}
-		function getDirection(e, n) {
-			if (!e.nodeSides) {
-				return null;
-			}
-			const v = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
-			const r = e.nodeSides[n];
-			const d = v.dot(nodes[n].p.sub(nodes[e.a].p));
-			if (Math.sign(d) != -r) {
-				return null;
-			}
-			return v.mul(-d);
-		}
+		const range = edgeArray.length;
+		const interMap = new Map();
+		const minD = nodeDistanceMin;
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e1 = edgeArray[i]
 			const endIndex = i >= edgeCount ? edgeCount : edgeArray.length;
@@ -366,52 +356,105 @@ function update() {
 				}
 				const cp = getClosestNodePoints(e1.a, e1.b, e2.a, e2.b);
 				const d = cp.p2.sub(cp.p1);
-				const minD = nodeDistanceMin;
-				const l = d.len();
-				if (l <= minD) {
-					let dir;
-					function maximize(d) {
-						dir = dir.add(d);
-					}
-					if (l < 1e-3) {
-						dir = new Vector();
-						const d1a = getDirection(e2, e1.a);
-						const d1b = getDirection(e2, e1.b);
-						const d2a = getDirection(e1, e2.a);
-						const d2b = getDirection(e1, e2.b);
-						if (d1a && !d1b) {
-							maximize(d1a);
-						}
-						if (d1b && !d1a) {
-							maximize(d1b);
-						}
-						if (d2a && !d2b) {
-							maximize(d2a.neg());
-						}
-						if (d2b && !d2a) {
-							maximize(d2b.neg());
-						}
-					}
-					else {
-						dir = d.div(l);
-						dir = dir.mul(minD - l);
-					}
-					const m = 0.06;
-					const v = dir.mul(m);
-					let sd = 0.5;
-					if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
-						nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
-					}
-					if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
-						nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
-					}
-					if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
-						nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
-					}
-					if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
-						nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
+				const l = d.lensq();
+				if (l <= minD * minD) {
+					const interKey = i * range + j;
+					interMap.set(interKey, cp);
+					if (l < 1e-6) {
+						nodes[e1.a].contactEdges.add(e1.b * range + j);
+						nodes[e1.b].contactEdges.add(e1.a * range + j);
+						nodes[e2.a].contactEdges.add(e2.b * range + i);
+						nodes[e2.b].contactEdges.add(e2.a * range + i);
 					}
 				}
+			}
+		}
+		function getDirection(e, ei, f) {
+			let v;
+			let ra = 0;
+			let rb = 0;
+			function dfs(i) {
+				const nb = nodes[i].contactEdges;
+				for (const j of adj[i]) {
+					if (v[j] != null) {
+						continue;
+					}
+					v[j] = v[i] + 1;
+					if (j == f.a) {
+						ra += v[j];
+						continue;
+					}
+					if (j == f.b) {
+						rb += v[j];
+						continue;
+					}
+					if (nb.has(j * range + ei)) {
+						continue;
+					}
+					dfs(j);
+				}
+			}
+			for (const s of [e.a, e.b]) {
+				v = [];
+				v[e.a] = 0;
+				v[e.b] = 0;
+				dfs(s);
+			}
+			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
+			let d;
+			if (ra < rb) {
+				d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
+			}
+			else {
+				d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
+			}
+			return n.mul(d);
+		}
+		for (const [k, cp] of interMap.entries()) {
+			const i1 = Math.floor(k / range);
+			const i2 = k % range;
+			const e1 = edgeArray[i1];
+			const e2 = edgeArray[i2];
+			const d = cp.p2.sub(cp.p1);
+			const l = d.len();
+			let dir;
+			if (l < 1e-3) {
+				dir = new Vector();
+				const d1 = getDirection(e2, i2, e1);
+				const d2 = getDirection(e1, i1, e2);
+				dir = dir.add(d1);
+				dir = dir.sub(d2);
+			}
+			else {
+				// if (nodes[e1.a].contactEdges.has(e2)) {
+					// continue;
+				// }
+				// if (nodes[e1.b].contactEdges.has(e2)) {
+					// continue;
+				// }
+				// if (nodes[e2.a].contactEdges.has(e1)) {
+					// continue;
+				// }
+				// if (nodes[e2.b].contactEdges.has(e1)) {
+					// continue;
+				// }
+				dir = d.div(l);
+				dir = dir.mul(minD - l);
+			}
+			const m = 0.06;
+			const v = dir.mul(m);
+			let sd = 0.5;
+			if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
+				nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
+			}
+			if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
+				nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
+			}
+			if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
+				nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
+			}
+			if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
+				nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
 			}
 		}
 		for (const i in nodes) {
@@ -429,99 +472,6 @@ function update() {
 			}
 		}
 	}
-}
-
-function updateNodeSides() {
-	const nodeIndices = [];
-	for (const i in nodes) {
-		nodeIndices.push(Number(i));
-	}
-	const edgeArrays = [];
-	for (const e of edges.values()) {
-		const a = {};
-		a[0] = e.a;
-		a[1] = e.b;
-		edgeArrays.push(a);
-	}
-	const map = getGlobalEdgeNodeSideArray(nodeIndices, edgeArrays);
-	const es = Array.from(edges.values());
-	for (let i = 0; i < es.length; i++) {
-		es[i].nodeSides = map[i].sides;
-	}
-}
-
-/**
- * Returns an array of objects for each edge.
- * Each object contains the edge pair and a 'sides' object mapping EVERY node to -1, 0, or 1.
- */
-function getGlobalEdgeNodeSideArray(nodes, edges) {
-    const n = nodes.length;
-    const adj = [];
-    
-    // 1. Deterministic sort of edges and adjacency lists
-    const sortedEdges = edges
-        .map(e => (e[0] < e[1] ? [e[0], e[1]] : [e[1], e[0]]))
-        .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-
-    for (const [u, v] of sortedEdges) {
-			adj[u]??=[];
-			adj[v]??=[];
-        adj[u].push(v);
-        adj[v].push(u);
-    }
-    for (let i = 0; i < n; i++) adj[i].sort((a, b) => a - b);
-
-    const dfn = new Array(n).fill(-1);
-    const subtree = Array.from({ length: n }, () => new Set());
-    let timer = 0;
-
-    // 2. Build DFS tree to establish "Inside/Outside" hierarchy
-    function buildTree(u, p = -1) {
-        dfn[u] = timer++;
-        subtree[u].add(u);
-        for (const v of adj[u]) {
-            if (v === p) continue;
-            if (dfn[v] === -1) {
-                buildTree(v, u);
-                // Child's subtree is part of parent's subtree
-                subtree[v].forEach(node => subtree[u].add(node));
-            }
-        }
-    }
-
-    for (let i = 0; i < n; i++) {
-        if (dfn[i] === -1) buildTree(i);
-    }
-
-    // 3. Generate the array of objects
-    return sortedEdges.map(([u, v]) => {
-        const sides = {};
-        
-        // Ensure parent/child order based on DFS traversal
-        const [parent, child] = dfn[u] < dfn[v] ? [u, v] : [v, u];
-        
-        // Deterministic 'preferred' side based on child's rank among its siblings
-        const siblings = adj[parent].filter(node => dfn[node] > dfn[parent]);
-        const childRank = siblings.indexOf(child);
-        const sideVal = (childRank % 2 === 0) ? 1 : -1;
-
-        for (let i = 0; i < n; i++) {
-            if (i === u || i === v) {
-                sides[i] = 0; 
-            } else if (subtree[child].has(i)) {
-                // Nodes in the child's branch get the preferred side
-                sides[i] = sideVal;
-            } else {
-                // All other nodes in the graph (ancestors/other branches) get the opposite
-                sides[i] = -sideVal;
-            }
-        }
-
-        return {
-            edge: [u, v],
-            sides: sides
-        };
-    });
 }
 
 function getClosestPoints(p1, p2, p3, p4) {
