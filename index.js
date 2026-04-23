@@ -18,6 +18,8 @@ const displaySvg = document.getElementById("display-svg");
 
 const exampleCountInput = document.getElementById("example-count-input");
 
+const exampleTypeInput = document.getElementById("example-type-input");
+
 var displayWidth = displaySvg.clientWidth;
 
 var displayHeight = displaySvg.clientHeight;
@@ -68,6 +70,44 @@ function onUpdate() {
 		adj[e.b] ??= [];
 		adj[e.b].push(e.a);
 	}
+	for (const e of edges.values()) {
+		for (const i in nodes) {
+			e.nodeSides[i] = {};
+		}
+	}
+	if(true)
+	{
+		for(let AT=0;AT<100000;AT++) {
+			const pos = {};
+			for (const i in nodes) {
+				pos[i] = getRandomPosition();
+			}
+			let b = false;
+			const edgeArray = Array.from(edges.values());
+			for (let i = 0; i < edgeArray.length && !b; i++) {
+				for (let j = i + 1; j < edgeArray.length && !b; j++) {
+					const e1 = edgeArray[i], e2 = edgeArray[j];
+					if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
+						continue;
+					}
+					const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
+					if (cp.p2.sub(cp.p1).len() < 1e-3) {
+						b = true;
+					}
+				}
+			}
+			if (!b) {
+				for (const e of edges.values()) {
+					const v = pos[e.b].sub(pos[e.a]).norm().left();
+					for (const i in nodes) {
+						e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
+					}
+				}
+				return;
+			}
+		}
+		console.log("NOT FOUND BRUTEFROCE");
+	}
 }
 
 function onRefresh() {
@@ -83,50 +123,59 @@ function onRefresh() {
 	onUpdate()
 }
 
-function onRandom() {
-    const n = Number(document.getElementById('example-count-input').value);
-    const type = document.getElementById('example-type-input').value;
-    let lines = "";
-
-    for (let i = 1; i < n; i++) {
-            const j = Math.floor(Math.random() * i);
-            const w = Math.floor(Math.random() * 9) + 1;
-            lines += Math.random() > 0.5 ? `${i} ${j} ${w}\n` : `${j} ${i} ${w}\n`;
-        }
-				
-				
-			//	const n = randomInt(10,10);
-	const degree = new Array(n).fill(0);
-	const existingEdges = new Set();
-	 lines = "";
-	function addEdgeInternal(a, b) {
-		if (a === b || existingEdges.has(`${a}-${b}`)) {
-			return false;
-		}
-		if (degree[a] >= 4 || degree[b] >= 4) {
-			return false;
-		}
-		existingEdges.add(`${a}-${b}`);
-		degree[a]++;
-		degree[b]++;
-		const w = randomInt(1, 9);
-		lines += `${a} ${b} ${w}\n`;
-		return true;
-	}
-	const extraEdges = Math.floor(n * 1.5);
-	let added = 0;
-	while (added < extraEdges) {
-		const a = randomInt(0, n - 1);
-		const b = randomInt(0, n - 1);
-		if (addEdgeInternal(a, b)) {
-			added++;
-		}
-	}
+function replaceEdges(lines) {
 	edgeListEdit.value = lines;
 	onRefresh();
+}
 
-    document.getElementById('edge-list-edit').value = lines;
-    onRefresh();
+function onRandom() {
+	updateInput();
+	const n = Number(exampleCountInput.value);
+	if (n <= 1) {
+		replaceEdges("");
+		return;
+	}
+	function getKey(a, b) {
+		return drawArrows ? (a + "-" + b) : (Math.min(a, b) + "-" + Math.max(a, b));
+	}
+	function genWeight() {
+		return randomInt(1, 9);
+	}
+	function genLine(a, b) {
+		return a + " " + b + (weightedEdges ? " " + genWeight() : "") + "\n";
+	}
+	let lines = "";
+	const type = exampleTypeInput.value;
+	const edgeMap = new Set();
+	if (type == "any") {
+		let edgeCount = randomInt(1, drawArrows ? n * 4 : n * 2);
+		let edges = [];
+		for (let i = 0; i < edgeCount; i++) {
+			for (let j = (drawArrows ? i : 0); j < edgeCount; j++) {
+				if (i == j) {
+					continue;
+				}
+				edges.push([i, j]);
+			}
+		}
+		for (let i = 0; i < edges.length && i < edgeCount; i++) {
+			const p = randomInt(i, edges.length - 1);
+			[edges[i], edges[p]] = [edges[p], edges[i]];
+		}
+		edges.length = Math.min(edges.length, edgeCount);
+	}
+	if (type == "planar") {
+		let faces = [[0, 1, 2]];
+		let edges = [[0, 1], [1, 2], [2, 0]];
+		for (let i = 3; i < n; i++) {
+			let faceIndex = randomInt(0, faces.length - 1);
+			let [a, b, c] = faces[faceIndex];
+			edges.push([i, a], [i, b], [i, c]);
+			faces.splice(faceIndex, 1, [i, a, b], [i, b, c], [i, c, a]);
+		}
+		const edgeCount = randomInt(1, Math.max(1, n * (drawArrows ? 4 : 3) - 6));
+	}
+	replaceEdges(lines);
 }
 
 function onApply() {
@@ -219,9 +268,13 @@ function init() {
 	update();
 }
 
-function update() {
+function updateInput() {
 	drawArrows = directedInput.checked;
 	weightedEdges = weightedInput.checked;
+}
+
+function update() {
+	updateInput();
 	requestAnimationFrame(update);
 	for (const i in nodes) {
 		nodes[i].svgElement.setAttribute("transform", `translate(${nodes[i].p.x}, ${nodes[i].p.y})`);
