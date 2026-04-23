@@ -577,8 +577,8 @@ function getClosestNodePoints(a, b, c, d) {
 }
 
 function getRandomPosition() {
-	const m = displayWidth / 3;
-	return new Vector(randomInt(m, displayWidth - m), randomInt(displayHeight / 3, displayHeight * 2 / 3));
+	const m = displayWidth / 4;
+	return new Vector(randomInt(m, displayWidth - m), randomInt(displayHeight / 4, displayHeight * 3 / 4));
 }
 
 function addNode(i) {
