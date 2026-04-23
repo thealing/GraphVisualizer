@@ -73,7 +73,7 @@ function onUpdate() {
 	for (const e of edges.values()) {
 		e.nodeSides = {};
 	}
-	if(true) // TODO: LR test
+	if(false) // TODO: LR test
 	{
 		for(let AT=0;AT<100000;AT++) {
 			const pos = {};
@@ -159,10 +159,37 @@ function onRandom() {
 			edges.push([p, i]);
 		}
 	}
-	for (let i = 0; i < edges.length && i < edgeCount; i++) {
-		const p = randomInt(i, edges.length - 1);
-		[edges[i], edges[p]] = [edges[p], edges[i]];
+	for (let i = 0; i < edges.length; i++) {
+		const j = randomInt(i, edges.length - 1);
+		[edges[i], edges[j]] = [edges[j], edges[i]];
 	}
+	function partitionEdges() {
+		const edgeMap = [];
+		for (let i = 0; i < n; i++) {
+			edgeMap[i] = [];
+		}
+		for (let i = 0; i < edges.length; i++) {
+			const e = edges[i];
+			edgeMap[e[0]].push([e[1], e]);
+			edgeMap[e[1]].push([e[0], e]);
+		}
+		const v = new Set();
+		const w = new Set();
+		for (let i = 0; i < n; i++) {
+			const b = Math.random() < 0.5;
+			v.add(i);
+			const a = edgeMap[i].find(p => v.has(p[0]) == b) ?? edgeMap[i].find(p => !w.has(p[1]));
+			if (!a) {
+				continue;
+			}
+			v.add(a[0]);
+			w.add(a[1]);
+		}
+		const usedEdges = edges.filter(e => w.has(e));
+		const otherEdges = edges.filter(e => !w.has(e));
+		edges = usedEdges.concat(otherEdges);
+	}
+	partitionEdges();
 	edges.length = Math.min(edges.length, edgeCount);
 	const finalEdges = [];
 	function genLine(e) {
@@ -187,6 +214,7 @@ function onRandom() {
 		lines += (a + 1) + " " + (b + 1) + (weightedEdges ? " " + randomInt(1, 9) : "") + "\n";
 	}
 	replaceEdges(lines);
+	console.log(Object.keys(nodes).length);
 }
 
 function onApply() {
