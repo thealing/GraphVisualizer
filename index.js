@@ -71,11 +71,9 @@ function onUpdate() {
 		adj[e.b].push(e.a);
 	}
 	for (const e of edges.values()) {
-		for (const i in nodes) {
-			e.nodeSides[i] = {};
-		}
+		e.nodeSides = {};
 	}
-	if(true)
+	if(true) // TODO: LR test
 	{
 		for(let AT=0;AT<100000;AT++) {
 			const pos = {};
@@ -135,45 +133,58 @@ function onRandom() {
 		replaceEdges("");
 		return;
 	}
-	function getKey(a, b) {
-		return drawArrows ? (a + "-" + b) : (Math.min(a, b) + "-" + Math.max(a, b));
-	}
-	function genWeight() {
-		return randomInt(1, 9);
-	}
-	function genLine(a, b) {
-		return a + " " + b + (weightedEdges ? " " + genWeight() : "") + "\n";
-	}
-	let lines = "";
 	const type = exampleTypeInput.value;
-	const edgeMap = new Set();
+	let edges = [];
+	let edgeCount = randomInt(n, n * 3);
 	if (type == "any") {
-		let edgeCount = randomInt(1, drawArrows ? n * 4 : n * 2);
-		let edges = [];
-		for (let i = 0; i < edgeCount; i++) {
-			for (let j = (drawArrows ? i : 0); j < edgeCount; j++) {
-				if (i == j) {
-					continue;
-				}
+		for (let i = 0; i < n; i++) {
+			for (let j = i + 1; j < n; j++) {
 				edges.push([i, j]);
 			}
 		}
-		for (let i = 0; i < edges.length && i < edgeCount; i++) {
-			const p = randomInt(i, edges.length - 1);
-			[edges[i], edges[p]] = [edges[p], edges[i]];
-		}
-		edges.length = Math.min(edges.length, edgeCount);
 	}
 	if (type == "planar") {
 		let faces = [[0, 1, 2]];
-		let edges = [[0, 1], [1, 2], [2, 0]];
+		edges = [[0, 1], [1, 2], [2, 0]];
 		for (let i = 3; i < n; i++) {
 			let faceIndex = randomInt(0, faces.length - 1);
 			let [a, b, c] = faces[faceIndex];
 			edges.push([i, a], [i, b], [i, c]);
 			faces.splice(faceIndex, 1, [i, a, b], [i, b, c], [i, c, a]);
 		}
-		const edgeCount = randomInt(1, Math.max(1, n * (drawArrows ? 4 : 3) - 6));
+	}
+	if (type == "tree") {
+		for (let i = 1; i < n; i++) {
+			const p = randomInt(0, i - 1);
+			edges.push([p, i]);
+		}
+	}
+	for (let i = 0; i < edges.length && i < edgeCount; i++) {
+		const p = randomInt(i, edges.length - 1);
+		[edges[i], edges[p]] = [edges[p], edges[i]];
+	}
+	edges.length = Math.min(edges.length, edgeCount);
+	const finalEdges = [];
+	function genLine(e) {
+		const [a, b] = e;
+		if (drawArrows) {
+			if (Math.random() > 0.8) {
+				finalEdges.push([a, b]);
+				finalEdges.push([b, a]);
+				return;
+			}
+			if (Math.random() > 0.5) {
+				finalEdges.push([b, a]);
+				return;
+			}
+		}
+		finalEdges.push([a, b]);
+	}
+	edges.forEach(genLine);
+	finalEdges.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+	let lines = "";
+	for (const [a, b] of finalEdges) {
+		lines += (a + 1) + " " + (b + 1) + (weightedEdges ? " " + randomInt(1, 9) : "") + "\n";
 	}
 	replaceEdges(lines);
 }
