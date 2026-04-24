@@ -73,7 +73,7 @@ function onUpdate() {
 	for (const e of edges.values()) {
 		e.nodeSides = {};
 	}
-	if(false) // TODO: LR test
+	if(true) // TODO: LR test
 	{
 		for(let AT=0;AT<100000;AT++) {
 			const pos = {};
@@ -135,7 +135,6 @@ function onRandom() {
 	}
 	const type = exampleTypeInput.value;
 	let edges = [];
-	let edgeCount = randomInt(n, n * 3);
 	if (type == "any") {
 		for (let i = 0; i < n; i++) {
 			for (let j = i + 1; j < n; j++) {
@@ -188,8 +187,9 @@ function onRandom() {
 		const usedEdges = edges.filter(e => w.has(e));
 		const otherEdges = edges.filter(e => !w.has(e));
 		edges = usedEdges.concat(otherEdges);
+		return randomInt(usedEdges.length, n * 3);
 	}
-	partitionEdges();
+	const edgeCount = partitionEdges();
 	edges.length = Math.min(edges.length, edgeCount);
 	const finalEdges = [];
 	function genLine(e) {
@@ -407,41 +407,49 @@ function update() {
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
 	const edgeArray = Array.from(edges.values());
-	const edgeCount = edgeArray.length;
 	for (const i in nodes) {
 		edgeArray.push(new Edge(i, i));
 	}
-	for (const i in nodes) {
-		nodes[i].contactEdges = new Set();
-	}
 	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
-			nodes[i].a = new Vector();
+			nodes[i].a = nodes[i].p.clone();
+		}
+		for (const i in nodes) {
+			const center = new Vector(displayWidth / 2, displayHeight / 2);
+			const d = nodes[i].p.sub(center);
+			const force = d.mul(0.02);
+			force.x /= displayWidth / displayHeight;
+			force.y *= displayWidth / displayHeight;
+			if (!nodes[i].dragging && !nodes[i].fixed) {
+				nodes[i].p.dec(force);
+			}
 		}
 		for (const e of edges.values()) {
 			const a = e.a;
 			const b = e.b;
 			const d = nodes[b].p.sub(nodes[a].p);
-			const l = d.len() || 0.001;
-			const force = d.mul((springDistance / l - 1) * 0.004);
-			nodes[a].a = nodes[a].a.add(force.neg());
-			nodes[b].a = nodes[b].a.add(force);
-		}
-		for (const i in nodes) {
-			const center = new Vector(displayWidth / 2, displayHeight / 2);
-			const d = nodes[i].p.sub(center);
-			const force = d.mul(0.0005);
-			force.x /= displayWidth / displayHeight;
-			force.y *= displayWidth / displayHeight;
-			nodes[i].a = nodes[i].a.add(force.neg());
+			const l = d.len();
+			if (l < 1e-3) {
+				continue;
+			}
+			const force = d.mul((springDistance / l - 1) * 0.04);
+			if (!nodes[a].dragging && !nodes[a].fixed) {
+				nodes[a].p.dec(force);
+			}
+			if (!nodes[b].dragging && !nodes[b].fixed) {
+				nodes[b].p.inc(force);
+			}
 		}
 		const range = edgeArray.length;
 		const interMap = new Map();
 		const minD = nodeDistanceMin;
+		for (const i in nodes) {
+			nodes[i].contactEdges = new Set();
+			nodes[i].intersections = new Set();
+		}
 		for (let i = 0; i < edgeArray.length; i++) {
-			const e1 = edgeArray[i]
-			const endIndex = i >= edgeCount ? edgeCount : edgeArray.length;
-			for (let j = i + 1; j < endIndex; j++) {
+			const e1 = edgeArray[i];
+			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e2 = edgeArray[j];
 				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
 					continue;
@@ -453,31 +461,35 @@ function update() {
 					const interKey = i * range + j;
 					interMap.set(interKey, cp);
 					if (l < 1e-6) {
-						nodes[e1.a].contactEdges.add(e1.b * range + j);
-						nodes[e1.b].contactEdges.add(e1.a * range + j);
-						nodes[e2.a].contactEdges.add(e2.b * range + i);
-						nodes[e2.b].contactEdges.add(e2.a * range + i);
+						nodes[e1.a].contactEdges.add(e2);
+						nodes[e1.b].contactEdges.add(e2);
+						nodes[e2.a].contactEdges.add(e1);
+						nodes[e2.b].contactEdges.add(e1);
+						nodes[e1.a].intersections.add(e1.b * range + j);
+						nodes[e1.b].intersections.add(e1.a * range + j);
+						nodes[e2.a].intersections.add(e2.b * range + i);
+						nodes[e2.b].intersections.add(e2.a * range + i);
 					}
 				}
 			}
 		}
 		function getDirection(e, ei, f) {
-			let v;
-			let ra = 0;
-			let rb = 0;
+			let v = new Set();
+			let ra = false;
+			let rb = false;
 			function dfs(i) {
-				const nb = nodes[i].contactEdges;
+				const nb = nodes[i].intersections;
 				for (const j of adj[i]) {
-					if (v[j] != null) {
+					if (v.has(j)) {
 						continue;
 					}
-					v[j] = v[i] + 1;
+					v.add(j);
 					if (j == f.a) {
-						ra += v[j];
+						ra = true;
 						continue;
 					}
 					if (j == f.b) {
-						rb += v[j];
+						rb = true;
 						continue;
 					}
 					if (nb.has(j * range + ei)) {
@@ -486,20 +498,16 @@ function update() {
 					dfs(j);
 				}
 			}
-			for (const s of [e.a, e.b]) {
-				v = [];
-				v[e.a] = 0;
-				v[e.b] = 0;
-				dfs(s);
-			}
+			dfs(e.a);
 			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
-			let d;
-			if (ra < rb) {
+			let d = 0;
+			if (!ra) {
 				d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
 			}
-			else {
+			if (!rb) {
 				d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
 			}
+			d += Math.sign(d) * minD;
 			return n.mul(d);
 		}
 		for (const [k, cp] of interMap.entries()) {
@@ -511,56 +519,41 @@ function update() {
 			const l = d.len();
 			let dir;
 			if (l < 1e-3) {
-				dir = new Vector();
 				const d1 = getDirection(e2, i2, e1);
 				const d2 = getDirection(e1, i1, e2);
-				dir = dir.add(d1);
-				dir = dir.sub(d2);
+				dir = new Vector();
+				dir.inc(d1);
+				dir.dec(d2);
 			}
 			else {
-				// if (nodes[e1.a].contactEdges.has(e2)) {
-					// continue;
-				// }
-				// if (nodes[e1.b].contactEdges.has(e2)) {
-					// continue;
-				// }
-				// if (nodes[e2.a].contactEdges.has(e1)) {
-					// continue;
-				// }
-				// if (nodes[e2.b].contactEdges.has(e1)) {
-					// continue;
-				// }
+				if (nodes[e1.a].contactEdges.has(e2)) {
+					continue;
+				}
+				if (nodes[e1.b].contactEdges.has(e2)) {
+					continue;
+				}
+				if (nodes[e2.a].contactEdges.has(e1)) {
+					continue;
+				}
+				if (nodes[e2.b].contactEdges.has(e1)) {
+					continue;
+				}
 				dir = d.div(l);
 				dir = dir.mul(minD - l);
 			}
-			const m = 0.06;
-			const v = dir.mul(m);
-			let sd = 0.5;
+			const v = dir;
+			let sd = 0.12;
 			if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
-				nodes[e1.a].a = nodes[e1.a].a.sub(v.mul(1 - cp.s).mul(sd));
+				nodes[e1.a].p.dec(v.mul(1 - cp.s).mul(sd));
 			}
 			if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
-				nodes[e1.b].a = nodes[e1.b].a.sub(v.mul(cp.s).mul(sd));
+				nodes[e1.b].p.dec(v.mul(cp.s).mul(sd));
 			}
 			if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
-				nodes[e2.a].a = nodes[e2.a].a.add(v.mul(1 - cp.t).mul(sd));
+				nodes[e2.a].p.inc(v.mul(1 - cp.t).mul(sd));
 			}
 			if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
-				nodes[e2.b].a = nodes[e2.b].a.add(v.mul(cp.t).mul(sd));
-			}
-		}
-		for (const i in nodes) {
-			nodes[i].v = nodes[i].v.add(nodes[i].a.mul(stepSize));
-			nodes[i].v = nodes[i].v.mul(Math.pow(0.95, stepSize));
-			const l = nodes[i].v.len();
-			const limit = nodeRadius * 0.7;
-			if (l > limit) {
-				nodes[i].v = nodes[i].v.mul(limit / l);
-			}
-		}
-		for (const i in nodes) {
-			if (!nodes[i].dragging && !nodes[i].fixed) {
-				nodes[i].p = nodes[i].p.add(nodes[i].v.mul(stepSize));
+				nodes[e2.b].p.inc(v.mul(cp.t).mul(sd));
 			}
 		}
 	}
@@ -771,6 +764,20 @@ class Vector {
 
 	sub(v) {
 		return new Vector(this.x - v.x, this.y - v.y);
+	}
+
+	clone() {
+		return new Vector(this.x, this.y);
+	}
+
+	inc(v) {
+		this.x += v.x;
+		this.y += v.y;
+	}
+
+	dec(v) {
+		this.x -= v.x;
+		this.y -= v.y;
 	}
 
 	mul(s) {
