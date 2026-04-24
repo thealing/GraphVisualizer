@@ -413,22 +413,26 @@ function update() {
 	for (let s = 0; s < subSteps; s++) {
 		for (const i in nodes) {
 			nodes[i].a = new Vector();
+			nodes[i].ac = 0;
 		}
 		for (const i in nodes) {
-			const offsetWidth = Math.max(0, (displayWidth - displayHeight) / 2);
-			const offsetHeight = Math.max(0, (displayHeight - displayWidth) / 2);
-			const offsetX = Math.min(Math.max(nodes[i].p.x - displayWidth / 2, -offsetWidth), offsetWidth);
-			const offsetY = Math.min(Math.max(nodes[i].p.y - displayHeight / 2, -offsetHeight), offsetHeight);
-			const center = new Vector(displayWidth / 2 + offsetX, displayHeight / 2 + offsetY);
-			let error = center.sub(nodes[i].p);
-			let l = error.len();
-			if (l > 1e-3) {
-				const n = error.div(l);
-				const tv = error.mul(0.1);
-				const rv = n.mul(n.dot(nodes[i].v));
-				const impulse = tv.sub(rv).mul(stepSize);
-				if (!nodes[i].dragging && !nodes[i].fixed) {
-					nodes[i].v = nodes[i].v.add(impulse);
+			const center = new Vector(displayWidth / 2, displayHeight / 2);
+			const dir = center.sub(nodes[i].p);
+			const extend = displayWidth + displayHeight;
+			const scale = new Vector(dir.x * displayHeight, dir.y * displayWidth).div(extend);
+			for (const k of ['x', 'y']) {
+				const error = new Vector();
+				error[k] = scale[k];
+				let l = error.len();
+				if (l > 1e-3) {
+					const n = error.div(l);
+					const tv = error.mul(0.1);
+					const rv = n.mul(n.dot(nodes[i].v));
+					const impulse = tv.sub(rv);
+					if (!nodes[i].dragging && !nodes[i].fixed) {
+						nodes[i].a = nodes[i].a.add(impulse);
+						nodes[i].ac++;
+					}
 				}
 			}
 		}
@@ -440,14 +444,16 @@ function update() {
 			if (l > 1e-3) {
 				const n = d.div(l);
 				const error = n.mul(springDistance - l);
-				const tv = error.mul(0.3);
+				const tv = error.mul(0.4);
 				const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
-				const impulse = tv.sub(rv).mul(0.5 * stepSize);
+				const impulse = tv.sub(rv).mul(0.5);
 				if (!nodes[a].dragging && !nodes[a].fixed) {
-					nodes[a].v = nodes[a].v.sub(impulse);
+					nodes[a].a = nodes[a].a.sub(impulse);
+					nodes[a].ac++;
 				}
 				if (!nodes[b].dragging && !nodes[b].fixed) {
-					nodes[b].v = nodes[b].v.add(impulse);
+					nodes[b].a = nodes[b].a.add(impulse);
+					nodes[b].ac++;
 				}
 			}
 		}
@@ -509,7 +515,7 @@ function update() {
 					dfs(j);
 				}
 			}
-			dfs(e.a);
+			// dfs(e.a);
 			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 			let d = 0;
 			if (!ra) {
@@ -528,13 +534,11 @@ function update() {
 			const e2 = edgeArray[i2];
 			const d = cp.p2.sub(cp.p1);
 			const l = d.len();
-			let dir;
+			let dir = new Vector();
 			if (l < 1e-3) {
 				const d1 = getDirection(e2, i2, e1);
 				const d2 = getDirection(e1, i1, e2);
-				dir = new Vector();
-				dir.inc(d1);
-				dir.dec(d2);
+				// dir = d1.sub(d2);
 			}
 			else {
 				if (nodes[e1.a].contactEdges.has(e2)) {
@@ -552,27 +556,40 @@ function update() {
 				dir = d.div(l);
 				dir = dir.mul(minD - l);
 			}
-			dir = new Vector();
-			const v = dir;
-			let sd = 0.006;
+			const r = dir.len();
+			if (r < 1e-3) {
+				continue;
+			}
+			const n = dir.div(r);
+			const v1 = nodes[e1.a].v.mul(1 - cp.s).add(nodes[e1.b].v.mul(cp.s));
+			const v2 = nodes[e2.a].v.mul(1 - cp.t).add(nodes[e2.b].v.mul(cp.t));
+			const dv = v2.sub(v1);
+			const da = r * 0.6 - n.dot(dv);
+			if (da <= 0) {
+				continue;
+			}
+			const impulse = n.mul(da).mul(0.5);
 			if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
-				nodes[e1.a].a.dec(v.mul(1 - cp.s).mul(sd));
+				nodes[e1.a].a = nodes[e1.a].a.sub(impulse.mul(1 - cp.s));
+				nodes[e1.a].ac++;
 			}
 			if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
-				nodes[e1.b].a.dec(v.mul(cp.s).mul(sd));
+				nodes[e1.b].a = nodes[e1.b].a.sub(impulse.mul(cp.s));
+				nodes[e1.b].ac++;
 			}
 			if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
-				nodes[e2.a].a.inc(v.mul(1 - cp.t).mul(sd));
+				nodes[e2.a].a = nodes[e2.a].a.add(impulse.mul(1 - cp.t));
+				nodes[e2.a].ac++;
 			}
 			if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
-				nodes[e2.b].a.inc(v.mul(cp.t).mul(sd));
+				nodes[e2.b].a = nodes[e2.b].a.add(impulse.mul(cp.t));
+				nodes[e2.b].ac++;
 			}
 		}
 		for (const i in nodes) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
-				// nodes[i].v.inc(nodes[i].a.mul(stepSize));
-				// nodes[i].v = nodes[i].v.mul(Math.pow(0.95, stepSize));
-				nodes[i].p.inc(nodes[i].v.mul(stepSize));
+				nodes[i].v = nodes[i].v.add(nodes[i].a.mul(stepSize / nodes[i].ac));
+				nodes[i].p = nodes[i].p.add(nodes[i].v.mul(stepSize));
 			}
 		}
 	}
@@ -785,16 +802,6 @@ class Vector {
 
 	clone() {
 		return new Vector(this.x, this.y);
-	}
-
-	inc(v) {
-		this.x += v.x;
-		this.y += v.y;
-	}
-
-	dec(v) {
-		this.x -= v.x;
-		this.y -= v.y;
 	}
 
 	mul(s) {
