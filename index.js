@@ -472,11 +472,10 @@ function update() {
 					const n = e.div(l);
 					const tv = l * 0.1;
 					const rv = n.dot(nodes[i].v);
-					const impulse = n.mul(Math.max(tv - rv, 0));
+					const impulse = n.mul(tv - rv, 0);
 					applyImpulse(i, impulse);
 				}
 			}
-			//nodes[i].p = nodes[i].p.add(displayCenter.sub(systemCenter).mul(0.03));
 		}
 		for (const e of undirectedEdges) {
 			const a = e.a;
