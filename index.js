@@ -211,7 +211,6 @@ function onRandom() {
 		lines += (a + 1) + " " + (b + 1) + (weightedEdges ? " " + randomInt(1, 9) : "") + "\n";
 	}
 	replaceEdges(lines);
-	console.log(Object.keys(nodes).length);
 }
 
 function onApply() {
@@ -423,11 +422,7 @@ function update() {
 	const dt = speed;
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
-	const edgeArray = Array.from(undirectedEdges);
-	for (const i in nodes) {
-		const e = new Edge(i, i, 0, true);
-		edgeArray.push(e);
-	}
+	const edgeArray = undirectedEdges;
 	for (let s = 0; s < subSteps; s++) {
 		let nodeCount = 0;
 		for (const i in nodes) {
@@ -454,9 +449,16 @@ function update() {
 				}
 			}
 		}
+		const systemCenter = new Vector(0, 0);
 		for (const i in nodes) {
-			const center = new Vector(displayWidth / 2, displayHeight / 2);
-			const dir = center.sub(nodes[i].p);
+			systemCenter.x += nodes[i].p.x;
+			systemCenter.y += nodes[i].p.y;
+		}
+		systemCenter.x /= nodeCount;
+		systemCenter.y /= nodeCount;
+		const displayCenter = new Vector(displayWidth / 2, displayHeight / 2);
+		for (const i in nodes) {
+			const dir = displayCenter.sub(systemCenter);
 			const distance = dir.len();
 			const width2 = displayWidth * displayWidth;
 			const height2 = displayHeight * displayHeight;
@@ -468,12 +470,13 @@ function update() {
 				const l = Math.abs(error[k]);
 				if (l > 1e-3) {
 					const n = e.div(l);
-					const tv = l * 0.3 / Math.sqrt(nodeCount);
+					const tv = l * 0.1;
 					const rv = n.dot(nodes[i].v);
 					const impulse = n.mul(Math.max(tv - rv, 0));
 					applyImpulse(i, impulse);
 				}
 			}
+			//nodes[i].p = nodes[i].p.add(displayCenter.sub(systemCenter).mul(0.03));
 		}
 		for (const e of undirectedEdges) {
 			const a = e.a;
@@ -489,6 +492,23 @@ function update() {
 				applyImpulse(a, impulse.neg());
 				applyImpulse(b, impulse);
 			}
+		}
+		function getDirection(e, f) {
+			const ra = e.distances[f.a];
+			const rb = e.distances[f.b];
+			if (ra == rb) {
+				return null;
+			}
+			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
+			let d = 0;
+			if (ra > rb) {
+				d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
+			}
+			if (rb > ra) {
+				d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
+			}
+			//d += Math.sign(d) * nodeDistanceMin;
+			return n.mul(Math.sign(d));
 		}
 		const edgePoints = new Float64Array(edgeArray.length * 4);
 		for (let i = 0; i < edgeArray.length; i++) {
@@ -552,7 +572,18 @@ function update() {
 				const l = Math.sqrt(lsq);
 				let error;
 				if (l < 1e-3) {
-					error = nodes[e1.b].p.sub(nodes[e1.a].p).norm().left();
+					if (e1.a == e1.b || e2.a == e2.b) {
+						continue;
+					}
+					error = new Vector();
+					const d1 = getDirection(e1, e2);
+					const d2 = getDirection(e2, e1);
+					if (d1) {
+						error = error.sub(d1);
+					}
+					if (d2) {
+						error = error.add(d2);
+					}
 				}
 				else {
 					error = d.div(l);
