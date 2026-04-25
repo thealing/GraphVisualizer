@@ -352,13 +352,13 @@ function updateInput() {
 function getBounds(element) {
 	const style = window.getComputedStyle(element);
 	const fontSize = element.attributes["font-size"] ?? "1";
-	const newFont = `${fontSize} ${displayFont}`;
+	const newFont = `${fontSize}px ${displayFont}`;
 	if (canvasFontProperty != newFont) {
 		canvasFontProperty = newFont;
 		canvasContext.font = newFont;
 	}
 	const m = canvasContext.measureText(element.textContent);
-	const w = m.width, h = parseFloat(fontSize); 
+	const w = m.width + 2, h = parseFloat(fontSize);
 	return { width: w, height: h };
 }
 
