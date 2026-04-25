@@ -540,16 +540,14 @@ function update() {
 			}
 		}
 		function getDirection(e, f) {
-			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 			const ra = e.distances[f.a];
 			const rb = e.distances[f.b];
+			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
+			if (ra == null && rb == null) {
+				return n;
+			}
 			if (ra == rb) {
-				if (rb == null) {
-					return n;
-				}
-				else {
-					return null;
-				}
+				return null;
 			}
 			let d = 0;
 			if (ra > rb) {
@@ -679,6 +677,45 @@ function update() {
 			applyImpulse(e1.b, impulse.mul(-s));
 			applyImpulse(e2.a, impulse.mul(1 - t));
 			applyImpulse(e2.b, impulse.mul(t));
+		}
+		for (const u in nodes) {
+			const nb = adj[u];
+			const n = nb.length;
+			if (n < 3) {
+				continue;
+			}
+			const targetAngle = (Math.PI * 2) / n;
+			for (let i = 0; i < n; i++) {
+				for (let j = i + 1; j < n; j++) {
+					const v1 = nb[i];
+					const v2 = nb[j];
+					const dx1 = nodes[v1].p.x - nodes[u].p.x;
+					const dy1 = nodes[v1].p.y - nodes[u].p.y;
+					const dx2 = nodes[v2].p.x - nodes[u].p.x;
+					const dy2 = nodes[v2].p.y - nodes[u].p.y;
+					const angle1 = Math.atan2(dy1, dx1);
+					const angle2 = Math.atan2(dy2, dx2);
+					let currentAngle = (angle2 - angle1) % (Math.PI * 2);
+					if (currentAngle < 0) {
+						currentAngle += Math.PI * 2;
+					}
+					let error = targetAngle * (j - i) - currentAngle;
+					const d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) + 1e-6;
+					const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) + 1e-6;
+					const tx1 = -dy1 / d1, ty1 = dx1 / d1;
+					const tx2 = -dy2 / d2, ty2 = dx2 / d2;
+					const rv1 = ((nodes[v1].v.x - nodes[u].v.x) * tx1 + (nodes[v1].v.y - nodes[u].v.y) * ty1) / d1;
+					const rv2 = ((nodes[v2].v.x - nodes[u].v.x) * tx2 + (nodes[v2].v.y - nodes[u].v.y) * ty2) / d2;
+					const rv = rv2 - rv1;
+					const da = error * 0.2 / n - rv;
+					const l = da * 0.5;
+					const imp1 = new Vector(tx1 * -l * d1, ty1 * -l * d1);
+					const imp2 = new Vector(tx2 * l * d2, ty2 * l * d2);
+					applyImpulse(v1, imp1);
+					applyImpulse(v2, imp2);
+					applyImpulse(u, imp1.add(imp2).neg());
+				}
+			}
 		}
 		finalizeImpulses();
 		for (const i in nodes) {
