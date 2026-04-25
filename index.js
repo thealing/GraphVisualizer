@@ -335,6 +335,10 @@ function init() {
 	window.addEventListener("touchend", () => {
 		draggingBackground = false;
 	});
+	canvasContext = document.createElement('canvas').getContext('2d');
+	const displayStyle = window.getComputedStyle(displaySvg);
+	displayFont = displayStyle.fontFamily;
+	canvasFontProperty = "";
 	onApply();
 	onUpdate();
 	update();
@@ -343,6 +347,19 @@ function init() {
 function updateInput() {
 	drawArrows = directedInput.checked;
 	weightedEdges = weightedInput.checked;
+}
+
+function getBounds(element) {
+	const style = window.getComputedStyle(element);
+	const fontSize = element.attributes["font-size"] ?? "1";
+	const newFont = `${fontSize} ${displayFont}`;
+	if (canvasFontProperty != newFont) {
+		canvasFontProperty = newFont;
+		canvasContext.font = newFont;
+	}
+	const m = canvasContext.measureText(element.textContent);
+	const w = m.width, h = parseFloat(fontSize); 
+	return { width: w, height: h };
 }
 
 function update() {
@@ -358,13 +375,13 @@ function update() {
 		const elem = e.svgElement;
 		const v = nodes[b].p.sub(nodes[a].p);
 		if (v.len() <= nodeRadius * 2) {
-			elem.group.setAttribute("visibility", "hidden");
-			e.arrow.setAttribute("visibility", "hidden");
-			elem.text.setAttribute("visibility", "hidden");
+			setAttributeCache(elem.group, "visibility", "hidden");
+			setAttributeCache(e.arrow, "visibility", "hidden");
+			setAttributeCache(elem.text, "visibility", "hidden");
 			continue;
 		}
-		elem.group.setAttribute("visibility", "visible");
-		elem.text.setAttribute("visibility", weightedEdges ? "visible" : "hidden");
+		setAttributeCache(elem.group, "visibility", "visible");
+		setAttributeCache(elem.text, "visibility", weightedEdges ? "visible" : "hidden");
 		const d = v.norm();
 		const start = nodes[a].p.add(d.mul(nodeRadius));
 		const end = nodes[b].p.sub(d.mul(nodeRadius));
@@ -375,7 +392,7 @@ function update() {
 		const scale = Math.min((v.len() - nodeRadius * 2) * 5 / 6, nodeRadius) / 20;
 		const dx = x2 - x1;
 		const dy = y2 - y1;
-		const bbox = elem.text.getBBox();
+		const bbox = getBounds(elem.text);
 		const len = Math.hypot(dx, dy) || 1;
 		const ux = dx / len;
 		const uy = dy / len;
@@ -400,11 +417,14 @@ function update() {
 			elem.line.setAttribute("x2", end.x);
 			elem.line.setAttribute("y2", end.y);
 		}
-		elem.text.textContent = e.weight;
-		elem.text.setAttribute("font-size", nodeRadius / 2);
+		if (elem.textStringContent != e.weight) {
+			elem.textStringContent = e.weight;
+			elem.text.textContent = e.weight;
+		}
+		setAttributeCache(elem.text, "font-size", nodeRadius / 2);
+		setAttributeCache(elem.line, "stroke-width", Math.min(nodeRadius / 25, scale * 3.5));
 		elem.text.setAttribute("x", mx - nx * offset);
 		elem.text.setAttribute("y", my - ny * offset);
-		elem.line.setAttribute("stroke-width", Math.min(nodeRadius / 25, scale * 3.5));
 		e.arrow.setAttribute("transform", `translate(${end.x}, ${end.y}) rotate(${Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI - 90}) scale(${scale})`);
 		e.arrow.setAttribute("visibility", drawArrows ? "visible" : "hidden");
 	}
@@ -625,31 +645,39 @@ function addEdge(a, b, w) {
 	}
 }
 
+function setAttributeCache(e, attribute, value) {
+	e.attributes ??= {};
+	if (e.attributes[attribute] != value) {
+		e.attributes[attribute] = value;
+		e.setAttribute(attribute, value);
+	}
+}
+
 function setNodeRadius(group, radius) {
 	const circle = group.querySelector("circle");
 	const text = group.querySelector("text");
-	circle.setAttribute("r", radius);
-	circle.setAttribute("stroke-width", radius / 25);
-	text.setAttribute("font-size", radius * 0.8);
+	setAttributeCache(circle, "r", radius);
+	setAttributeCache(circle, "stroke-width", radius / 25);
+	setAttributeCache(circle, "font-size", radius * 0.8);
 }
 
 function createSvgNode(x, y, i) {
 	const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-	group.setAttribute("transform", `translate(${x}, ${y})`);
+	setAttributeCache(group, "transform", `translate(${x}, ${y})`);
 	const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-	circle.setAttribute("cx", 0);
-	circle.setAttribute("cy", 0);
-	circle.setAttribute("r", nodeRadius);
-	circle.setAttribute("fill", "lightgray");
-	circle.setAttribute("stroke", "black");
-	circle.setAttribute("stroke-width", 1);
+	setAttributeCache(circle, "cx", 0);
+	setAttributeCache(circle, "cy", 0);
+	setAttributeCache(circle, "r", nodeRadius);
+	setAttributeCache(circle, "fill", "lightgray");
+	setAttributeCache(circle, "stroke", "black");
+	setAttributeCache(circle, "stroke-width", 1);
 	group.appendChild(circle);
 	const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-	text.setAttribute("cx", 0);
-	text.setAttribute("cy", 0);
-	text.setAttribute("text-anchor", "middle");
-	text.setAttribute("dy", "0.35em");
-	text.setAttribute("fill", "black");
+	setAttributeCache(text, "cx", 0);
+	setAttributeCache(text, "cy", 0);
+	setAttributeCache(text, "text-anchor", "middle");
+	setAttributeCache(text, "dy", "0.35em");
+	setAttributeCache(text, "fill", "black");
 	text.textContent = i;
 	group.appendChild(text);
 	nodesLayer.appendChild(group);
@@ -659,13 +687,13 @@ function createSvgNode(x, y, i) {
 function createSvgEdge() {
 	const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
 	const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-	line.setAttribute("stroke", "black");
-	line.setAttribute("stroke-width", 1);
+	setAttributeCache(line, "stroke", "black");
+	setAttributeCache(line, "stroke-width", 1);
 	const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-	text.setAttribute("text-anchor", "middle");
-	text.setAttribute("fill", "black");
-	text.setAttribute("dy", "0.35em");
-	text.setAttribute("text-rendering", "geometricPrecision");
+	setAttributeCache(text, "text-anchor", "middle");
+	setAttributeCache(text, "fill", "black");
+	setAttributeCache(text, "dy", "0.35em");
+	setAttributeCache(text, "text-rendering", "geometricPrecision");
 	text.textContent = "0.0\n";
 	group.appendChild(line);
 	group.appendChild(text);
@@ -675,8 +703,8 @@ function createSvgEdge() {
 
 function createSvgArrow() {
 	const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
-	arrow.setAttribute("fill", "black");
-	arrow.setAttribute("d", "M-7,-10 L0,0 L7,-10 Z");
+	setAttributeCache(arrow, "fill", "black");
+	setAttributeCache(arrow, "d", "M-7,-10 L0,0 L7,-10 Z");
 	edgesLayer.appendChild(arrow);
 	return arrow;
 }
