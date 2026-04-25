@@ -655,7 +655,7 @@ function setNodeRadius(group, radius) {
 	const text = group.querySelector("text");
 	setAttributeCache(circle, "r", radius);
 	setAttributeCache(circle, "stroke-width", radius / 25);
-	setAttributeCache(circle, "font-size", radius * 0.8);
+	setAttributeCache(text, "font-size", radius * 0.8);
 }
 
 function createSvgNode(x, y, i) {
