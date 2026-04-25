@@ -64,14 +64,43 @@ function onUpdate() {
 		}
 	}
 	adj = {};
+	undirectedEdges = [];
+	const edgeMap = new Set();
 	for (const e of edges.values()) {
+		const key = Math.min(e.a, e.b) + '-' + Math.max(e.a, e.b);
+		if (edgeMap.has(key)) {
+			continue;
+		}
+		edgeMap.add(key);
+		undirectedEdges.push(e);
 		adj[e.a] ??= [];
 		adj[e.a].push(e.b);
 		adj[e.b] ??= [];
 		adj[e.b].push(e.a);
 	}
-	for (const e of edges.values()) {
+	for (const e of undirectedEdges) {
 		e.nodeSides = {};
+	}
+	const distanceCache = new Map();
+	for (const e of undirectedEdges) {
+		if (!distanceCache.has(e.a)) {
+			const queue = [e.a];
+			const distances = [];
+			distances[e.a] = 0;
+			let i = 0;
+			while (i < queue.length) {
+				const a = queue[i++];
+				const d = distances[a];
+				for (const b of adj[a]) {
+					if (distances[b] == null) {
+						distances[b] = d + 1;
+						queue.push(b);
+					}
+				}
+			}
+			distanceCache.set(e.a, distances);
+		}
+		e.distances = distanceCache.get(e.a);
 	}
 	if(true) // TODO: LR test
 	{
@@ -81,7 +110,7 @@ function onUpdate() {
 				pos[i] = getRandomPosition();
 			}
 			let b = false;
-			const edgeArray = Array.from(edges.values());
+			const edgeArray = Array.from(undirectedEdges);
 			for (let i = 0; i < edgeArray.length && !b; i++) {
 				for (let j = i + 1; j < edgeArray.length && !b; j++) {
 					const e1 = edgeArray[i], e2 = edgeArray[j];
@@ -89,13 +118,13 @@ function onUpdate() {
 						continue;
 					}
 					const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
-					if (cp.p2.sub(cp.p1).len() < 1e-3) {
+					if (cp) {
 						b = true;
 					}
 				}
 			}
 			if (!b) {
-				for (const e of edges.values()) {
+				for (const e of undirectedEdges) {
 					const v = pos[e.b].sub(pos[e.a]).norm().left();
 					for (const i in nodes) {
 						e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
@@ -135,6 +164,7 @@ function onRandom() {
 	}
 	const type = exampleTypeInput.value;
 	let edges = [];
+	let filterEdges = true;
 	if (type == "any") {
 		for (let i = 0; i < n; i++) {
 			for (let j = i + 1; j < n; j++) {
@@ -157,6 +187,7 @@ function onRandom() {
 			const p = randomInt(0, i - 1);
 			edges.push([p, i]);
 		}
+		filterEdges = false;
 	}
 	for (let i = 0; i < edges.length; i++) {
 		const j = randomInt(i, edges.length - 1);
@@ -190,27 +221,29 @@ function onRandom() {
 		return randomInt(usedEdges.length, n * 3);
 	}
 	const edgeCount = partitionEdges();
-	edges.length = Math.min(edges.length, edgeCount);
-	const finalEdges = [];
+	if (filterEdges) {
+		edges.length = Math.min(edges.length, edgeCount);
+	}
+	const directedEdges = [];
 	function genLine(e) {
 		const [a, b] = e;
 		if (drawArrows) {
 			if (Math.random() > 0.8) {
-				finalEdges.push([a, b]);
-				finalEdges.push([b, a]);
+				directedEdges.push([a, b]);
+				directedEdges.push([b, a]);
 				return;
 			}
 			if (Math.random() > 0.5) {
-				finalEdges.push([b, a]);
+				directedEdges.push([b, a]);
 				return;
 			}
 		}
-		finalEdges.push([a, b]);
+		directedEdges.push([a, b]);
 	}
 	edges.forEach(genLine);
-	finalEdges.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+	directedEdges.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
 	let lines = "";
-	for (const [a, b] of finalEdges) {
+	for (const [a, b] of directedEdges) {
 		lines += (a + 1) + " " + (b + 1) + (weightedEdges ? " " + randomInt(1, 9) : "") + "\n";
 	}
 	replaceEdges(lines);
@@ -403,12 +436,13 @@ function update() {
 		}
 		return;
 	}
-	const dt = speed; 
+	const dt = speed;
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
-	const edgeArray = Array.from(edges.values());
+	const edgeArray = Array.from(undirectedEdges);
 	for (const i in nodes) {
-		edgeArray.push(new Edge(i, i, 0, true));
+		const e = new Edge(i, i, 0, true);
+		edgeArray.push(e);
 	}
 	for (let s = 0; s < subSteps; s++) {
 		let nodeCount = 0;
@@ -417,7 +451,7 @@ function update() {
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
 		}
-		const impulseLimit = nodeRadius * 1.2;
+		const impulseLimit = nodeRadius * 0.5;
 		function applyImpulse(i, impulse) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
 				const l = impulse.len();
@@ -428,6 +462,12 @@ function update() {
 					nodes[i].a = nodes[i].a.add(impulse);
 					nodes[i].ac++;
 				}
+			}
+		}
+		function finalizeImpulses() {
+			for (const i in nodes) {
+				nodes[i].v = nodes[i].v.add(nodes[i].a.mul(stepSize / nodes[i].ac));
+				nodes[i].ac = 0;
 			}
 		}
 		for (const i in nodes) {
@@ -444,14 +484,14 @@ function update() {
 				const l = Math.abs(error[k]);
 				if (l > 1e-3) {
 					const n = e.div(l);
-					const tv = l * 0.3 / Math.sqrt(nodeCount);
+					const tv = l * 0.01 / Math.sqrt(nodeCount);
 					const rv = n.dot(nodes[i].v);
 					const impulse = n.mul(Math.max(tv - rv, 0));
 					applyImpulse(i, impulse);
 				}
 			}
 		}
-		for (const e of edges.values()) {
+		for (const e of undirectedEdges) {
 			const a = e.a;
 			const b = e.b;
 			const d = nodes[b].p.sub(nodes[a].p);
@@ -459,19 +499,48 @@ function update() {
 			if (l > 1e-3) {
 				const n = d.div(l);
 				const error = n.mul(springDistance - l);
-				const tv = error.mul(0.4);
+				const tv = error.mul(0.3);
 				const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
 				const impulse = tv.sub(rv).mul(0.5);
 				applyImpulse(a, impulse.neg());
 				applyImpulse(b, impulse);
 			}
 		}
-		const range = edgeArray.length;
-		const interMap = new Map();
-		const minD = nodeDistanceMin;
 		for (const i in nodes) {
-			nodes[i].contactEdges = new Set();
-			nodes[i].intersections = new Set();
+			nodes[i].neighbors = new Set();
+		}
+		function solveMisplacedNode(e, i, n) {
+			nodes[i].neighbors.add(e.a);
+			nodes[i].neighbors.add(e.b);
+			let d = n.dot(nodes[i].p.sub(nodes[e.a].p));
+			d += Math.sign(d) * nodeDistanceMin;
+			d = -d;
+			const cp = getClosestNodePointOnLine(e.a, e.b, i);
+			const v1 = nodes[e.a].v.mul(1 - cp.s).add(nodes[e.b].v.mul(cp.s));
+			const v2 = nodes[i].v;
+			const dv = v2.sub(v1);
+			const da = d * 0.8 - Math.sign(d) * n.dot(dv);
+			if (da <= 0) {
+				return;
+			}
+			const impulse = n.mul(da * 0.5);
+			applyImpulse(e.a, impulse.mul(-1 + cp.s));
+			applyImpulse(e.b, impulse.mul(-cp.s));
+			applyImpulse(i, impulse);
+		}
+		function solveIntersection(e, f) {
+			const ra = e.distances[f.a];
+			const rb = e.distances[f.b];
+			if (ra == rb) {
+				return new Vector();
+			}
+			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
+			if (ra > rb) {
+				solveMisplacedNode(e, f.a, n);
+			}
+			if (rb > ra) {
+				solveMisplacedNode(e, f.b, n);
+			}
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e1 = edgeArray[i];
@@ -481,112 +550,69 @@ function update() {
 					continue;
 				}
 				const cp = getClosestNodePoints(e1.a, e1.b, e2.a, e2.b);
-				const d = cp.p2.sub(cp.p1);
-				const l = d.lensq();
-				if (l <= minD * minD) {
-					const interKey = i * range + j;
-					interMap.set(interKey, cp);
-					if (l < 1e-6) {
-						nodes[e1.a].contactEdges.add(e2);
-						nodes[e1.b].contactEdges.add(e2);
-						nodes[e2.a].contactEdges.add(e1);
-						nodes[e2.b].contactEdges.add(e1);
-						nodes[e1.a].intersections.add(e1.b * range + j);
-						nodes[e1.b].intersections.add(e1.a * range + j);
-						nodes[e2.a].intersections.add(e2.b * range + i);
-						nodes[e2.b].intersections.add(e2.a * range + i);
-					}
-				}
-			}
-		}
-		function getDirection(e, ei, f) {
-			let v = new Set();
-			let ra = false;
-			let rb = false;
-			function dfs(i) {
-				const nb = nodes[i].intersections;
-				for (const j of adj[i]) {
-					if (v.has(j)) {
-						continue;
-					}
-					v.add(j);
-					if (j == f.a) {
-						ra = true;
-						continue;
-					}
-					if (j == f.b) {
-						rb = true;
-						continue;
-					}
-					if (nb.has(j * range + ei)) {
-						continue;
-					}
-					dfs(j);
-				}
-			}
-			dfs(e.a);
-			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
-			let d = 0;
-			if (!ra) {
-				d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
-			}
-			if (!rb) {
-				d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
-			}
-			d += Math.sign(d) * minD;
-			return n.mul(d);
-		}
-		for (const [k, cp] of interMap.entries()) {
-			const i1 = Math.floor(k / range);
-			const i2 = k % range;
-			const e1 = edgeArray[i1];
-			const e2 = edgeArray[i2];
-			const d = cp.p2.sub(cp.p1);
-			const l = d.len();
-			let dir = new Vector();
-			if (l < 1e-3) {
-				const d1 = getDirection(e2, i2, e1);
-				const d2 = getDirection(e1, i1, e2);
-				dir = d1.sub(d2);
-			}
-			else {
-				if (nodes[e1.a].contactEdges.has(e2)) {
+				if (cp == null) {
 					continue;
 				}
-				if (nodes[e1.b].contactEdges.has(e2)) {
-					continue;
-				}
-				if (nodes[e2.a].contactEdges.has(e1)) {
-					continue;
-				}
-				if (nodes[e2.b].contactEdges.has(e1)) {
-					continue;
-				}
-				dir = d.div(l);
-				dir = dir.mul(minD - l);
+				solveIntersection(e1, e2);
+				solveIntersection(e2, e1);
 			}
-			const r = dir.len();
-			if (r < 1e-3) {
-				continue;
-			}
-			const n = dir.div(r);
-			const v1 = nodes[e1.a].v.mul(1 - cp.s).add(nodes[e1.b].v.mul(cp.s));
-			const v2 = nodes[e2.a].v.mul(1 - cp.t).add(nodes[e2.b].v.mul(cp.t));
-			const dv = v2.sub(v1);
-			const da = r * 0.6 - n.dot(dv);
-			if (da <= 0) {
-				continue;
-			}
-			const impulse = n.mul(da).mul(0.8);
-			applyImpulse(e1.a, impulse.mul(-1 + cp.s));
-			applyImpulse(e1.b, impulse.mul(-cp.s));
-			applyImpulse(e2.a, impulse.mul(1 - cp.t));
-			applyImpulse(e2.b, impulse.mul(cp.t));
 		}
 		for (const i in nodes) {
-			nodes[i].v = nodes[i].v.add(nodes[i].a.mul(stepSize / nodes[i].ac));
+			for (const j in nodes) {
+				if (i == j) {
+					continue;
+				}
+				if (!nodes[i].neighbors.has(j)) {
+					continue;
+				}
+				const d = nodes[j].p.sub(nodes[i].p);
+				const l = d.len();
+				if (l < 1e-3 || l >= nodeDistanceMin) {
+					continue;
+				}
+				const n = d.div(l);
+				const vr = nodes[j].v.sub(nodes[i].v);
+				const da = (nodeDistanceMin - l) * 0.4 - n.dot(vr);
+				if (da <= 0) {
+					continue;
+				}
+				const impulse = n.mul(da * 0.5);
+				// applyImpulse(i, impulse.neg());
+				// applyImpulse(j, impulse);
+			}
+			for (const e of edgeArray) {
+				if (e.a == i || e.b == i) {
+					continue;
+				}
+				if (nodes[i].neighbors.has(e.a)) {
+					continue;
+				}
+				if (nodes[i].neighbors.has(e.b)) {
+					continue;
+				}
+				const cp = getClosestNodePoint(e.a, e.b, i);
+				const error = nodes[i].p.sub(cp.p);
+				const l = error.len();
+				if (l < 1e-3 || l >= nodeDistanceMin) {
+					continue;
+				}
+				const n = error.div(l);
+				const v1 = nodes[e.a].v.mul(1 - cp.s).add(nodes[e.b].v.mul(cp.s));
+				const v2 = nodes[i].v;
+				const da = (nodeDistanceMin - l) * 0.6 - (n.dot(v2) - n.dot(v1));
+				if (da <= 0) {
+					continue;
+				}
+				const impulse = n.mul(da * 0.5);
+				applyImpulse(e.a, impulse.mul(-1 + cp.s));
+				applyImpulse(e.b, impulse.mul(-cp.s));
+				applyImpulse(i, impulse);
+			}
+		}
+		finalizeImpulses();
+		for (const i in nodes) {
 			const l = nodes[i].v.len();
-			const limit = nodeRadius * 0.7;
+			const limit = nodeRadius * 0.1;
 			if (l > limit) {
 				nodes[i].v = nodes[i].v.mul(limit / l);
 			}
@@ -597,6 +623,29 @@ function update() {
 			}
 		}
 	}
+}
+
+function getClosestPointOnLine(p1, p2, p3) {
+	const u = p2.sub(p1);
+	const w = p3.sub(p1);
+	const l = u.lensq();
+	if (l < 1e-6) {
+		return { s: 0, p: p1 };
+	}
+	let s = w.dot(u) / l;
+	return { s, p: p1.add(u.mul(s)) };
+}
+
+function getClosestPoint(p1, p2, p3) {
+	const u = p2.sub(p1);
+	const w = p3.sub(p1);
+	const l = u.lensq();
+	if (l < 1e-6) {
+		return { s: 0, p: p1 };
+	}
+	let s = w.dot(u) / l;
+	s = Math.max(0, Math.min(1, s));
+	return { s, p: p1.add(u.mul(s)) };
 }
 
 function getClosestPoints(p1, p2, p3, p4) {
@@ -611,26 +660,25 @@ function getClosestPoints(p1, p2, p3, p4) {
 	const D = a * c - b * b;
 	const E = 1e-6;
 	if (D < E) {
-		const s0 = Math.max(0, Math.min(1, a < E ? 0 : p3.sub(p1).dot(u) / a));
-		const s1 = Math.max(0, Math.min(1, a < E ? 0 : p4.sub(p1).dot(u) / a));
-		const t0 = Math.max(0, Math.min(1, c < E ? 0 : p1.sub(p3).dot(v) / c));
-		const t1 = Math.max(0, Math.min(1, c < E ? 0 : p2.sub(p3).dot(v) / c));
-		s = (s0 + s1) / 2;
-		t = (t0 + t1) / 2;
+		return null;
 	}
-	else {
-		s = (b * e - c * d) / D;
-		t = (a * e - b * d) / D;
-		if (s < 0 || s > 1) {
-			s = Math.max(0, Math.min(1, s));
-			t = (s * b + e) / c;
-		}
-		if (t < 0 || t > 1) {
-			t = Math.max(0, Math.min(1, t));
-			s = Math.max(0, Math.min(1, (t * b - d) / a));
-		}
+	const s = (b * e - c * d) / D;
+	const t = (a * e - b * d) / D;
+	if (s < 0 || s > 1) {
+		return null;
+	}
+	if (t < 0 || t > 1) {
+		return null;
 	}
 	return { s, t, p1: p1.add(u.mul(s)), p2: p3.add(v.mul(t)) };
+}
+
+function getClosestNodePointOnLine(a, b, c) {
+	return getClosestPointOnLine(nodes[a].p, nodes[b].p, nodes[c].p);
+}
+
+function getClosestNodePoint(a, b, c) {
+	return getClosestPoint(nodes[a].p, nodes[b].p, nodes[c].p);
 }
 
 function getClosestNodePoints(a, b, c, d) {
