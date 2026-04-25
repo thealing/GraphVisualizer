@@ -444,7 +444,7 @@ function update() {
 				const l = Math.abs(error[k]);
 				if (l > 1e-3) {
 					const n = e.div(l);
-					const tv = l * 0.1 / Math.sqrt(nodeCount);
+					const tv = l * 0.3 / Math.sqrt(nodeCount);
 					const rv = n.dot(nodes[i].v);
 					const impulse = n.mul(Math.max(tv - rv, 0));
 					applyImpulse(i, impulse);
