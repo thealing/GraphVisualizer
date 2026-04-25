@@ -467,31 +467,59 @@ function update() {
 				}
 			}
 		}
-		const systemCenter = new Vector(0, 0);
-		for (const i in nodes) {
-			systemCenter.x += nodes[i].p.x;
-			systemCenter.y += nodes[i].p.y;
+		function findGroups() {
+			const v = new Set();
+			function dfs(g, i) {
+				g.push(i);
+				for (const j of adj[i]) {
+					if (v.has(j)) {
+						continue;
+					}
+					v.add(j);
+					dfs(g, j);
+				}
+			}
+			const groups = [];
+			for (const s in nodes) {
+				const i = Number(s);
+				if (v.has(i)) {
+					continue;
+				}
+				v.add(i);
+				const group = [];
+				dfs(group, i);
+				groups.push(group);
+			}
+			return groups;
 		}
-		systemCenter.x /= nodeCount;
-		systemCenter.y /= nodeCount;
-		const displayCenter = new Vector(displayWidth / 2, displayHeight / 2);
-		for (const i in nodes) {
-			const dir = displayCenter.sub(systemCenter);
-			const distance = dir.len();
-			const width2 = displayWidth * displayWidth;
-			const height2 = displayHeight * displayHeight;
-			const denom = width2 + height2;
-			const error = new Vector(dir.x * height2 / denom, dir.y * width2 / denom);
-			for (const k of ['x', 'y']) {
-				const e = new Vector();
-				e[k] = error[k];
-				const l = Math.abs(error[k]);
-				if (l > 1e-3) {
-					const n = e.div(l);
-					const tv = l * 0.1;
-					const rv = n.dot(nodes[i].v);
-					const impulse = n.mul(tv - rv, 0);
-					applyImpulse(i, impulse);
+		const groups = findGroups();
+		for (const group of groups) {
+			const center = new Vector(0, 0);
+			for (const i of group) {
+				center.x += nodes[i].p.x;
+				center.y += nodes[i].p.y;
+			}
+			center.x /= group.length;
+			center.y /= group.length;
+			const displayCenter = new Vector(displayWidth / 2, displayHeight / 2);
+			for (const i of group) {
+				const dir = displayCenter.sub(center);
+				const distance = dir.len();
+				const width2 = displayWidth * displayWidth;
+				const height2 = displayHeight * displayHeight;
+				const denom = width2 + height2;
+				const error = new Vector(dir.x * height2 / denom, dir.y * width2 / denom);
+				for (const k of ['x', 'y']) {
+					const e = new Vector();
+					e[k] = error[k];
+					const l = Math.abs(error[k]);
+					if (l > 1e-3) {
+						const n = e.div(l);
+						const tv = l * 0.1 * group.length / nodeCount;
+						const rv = n.dot(nodes[i].v);
+						const impulse = n.mul(tv - rv, 0);
+						applyImpulse(i, impulse);
+					}
 				}
 			}
 		}
