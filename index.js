@@ -456,9 +456,9 @@ function update() {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
 				const l = impulse.len();
 				if (l > 1e-3) {
-					if (l > impulseLimit) {
-						impulse = impulse.mul(impulseLimit / l);
-					}
+					// if (l > impulseLimit) {
+						// impulse = impulse.mul(impulseLimit / l);
+					// }
 					nodes[i].a = nodes[i].a.add(impulse);
 					nodes[i].ac++;
 				}
@@ -484,7 +484,7 @@ function update() {
 				const l = Math.abs(error[k]);
 				if (l > 1e-3) {
 					const n = e.div(l);
-					const tv = l * 0.01 / Math.sqrt(nodeCount);
+					const tv = l * 0.2 / Math.sqrt(nodeCount);
 					const rv = n.dot(nodes[i].v);
 					const impulse = n.mul(Math.max(tv - rv, 0));
 					applyImpulse(i, impulse);
@@ -499,122 +499,58 @@ function update() {
 			if (l > 1e-3) {
 				const n = d.div(l);
 				const error = n.mul(springDistance - l);
-				const tv = error.mul(0.3);
+				const tv = error.mul(0.4);
 				const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
 				const impulse = tv.sub(rv).mul(0.5);
 				applyImpulse(a, impulse.neg());
 				applyImpulse(b, impulse);
 			}
 		}
-		for (const i in nodes) {
-			nodes[i].neighbors = new Set();
-		}
-		function solveMisplacedNode(e, i, n) {
-			nodes[i].neighbors.add(e.a);
-			nodes[i].neighbors.add(e.b);
-			let d = n.dot(nodes[i].p.sub(nodes[e.a].p));
-			d += Math.sign(d) * nodeDistanceMin;
-			d = -d;
-			const cp = getClosestNodePointOnLine(e.a, e.b, i);
-			const v1 = nodes[e.a].v.mul(1 - cp.s).add(nodes[e.b].v.mul(cp.s));
-			const v2 = nodes[i].v;
-			const dv = v2.sub(v1);
-			const da = d * 0.8 - Math.sign(d) * n.dot(dv);
-			if (da <= 0) {
-				return;
-			}
-			const impulse = n.mul(da * 0.5);
-			applyImpulse(e.a, impulse.mul(-1 + cp.s));
-			applyImpulse(e.b, impulse.mul(-cp.s));
-			applyImpulse(i, impulse);
-		}
-		function solveIntersection(e, f) {
-			const ra = e.distances[f.a];
-			const rb = e.distances[f.b];
-			if (ra == rb) {
-				return new Vector();
-			}
-			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
-			if (ra > rb) {
-				solveMisplacedNode(e, f.a, n);
-			}
-			if (rb > ra) {
-				solveMisplacedNode(e, f.b, n);
-			}
-		}
+		let cdd=0,ddd=performance.now();
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e1 = edgeArray[i];
 			for (let j = i + 1; j < edgeArray.length; j++) {
-				const e2 = edgeArray[j];
-				if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
-					continue;
-				}
+				const e2 = edgeArray[j];cdd++;
 				const cp = getClosestNodePoints(e1.a, e1.b, e2.a, e2.b);
-				if (cp == null) {
-					continue;
-				}
-				solveIntersection(e1, e2);
-				solveIntersection(e2, e1);
-			}
-		}
-		for (const i in nodes) {
-			for (const j in nodes) {
-				if (i == j) {
-					continue;
-				}
-				if (!nodes[i].neighbors.has(j)) {
-					continue;
-				}
-				const d = nodes[j].p.sub(nodes[i].p);
+				const d = cp.p2.sub(cp.p1);
 				const l = d.len();
-				if (l < 1e-3 || l >= nodeDistanceMin) {
+				if (l >= nodeDistanceMin) {
 					continue;
 				}
-				const n = d.div(l);
-				const vr = nodes[j].v.sub(nodes[i].v);
-				const da = (nodeDistanceMin - l) * 0.4 - n.dot(vr);
+				let error;
+				if (l < 1e-3) {
+					error = nodes[e1.b].p.sub(nodes[e1.a].p).norm().left();
+				}
+				else {
+					error = d.div(l);
+				}
+				error = error.mul(nodeDistanceMin - l);
+				const r = error.len();
+				if (r < 1e-3) {
+					continue;
+				}
+				const n = error.div(r);
+				const v1 = nodes[e1.a].v.mul(1 - cp.s).add(nodes[e1.b].v.mul(cp.s));
+				const v2 = nodes[e2.a].v.mul(1 - cp.t).add(nodes[e2.b].v.mul(cp.t));
+				const dv = v2.sub(v1);
+				const da = r * 0.8 - n.dot(dv);
 				if (da <= 0) {
 					continue;
 				}
 				const impulse = n.mul(da * 0.5);
-				// applyImpulse(i, impulse.neg());
-				// applyImpulse(j, impulse);
-			}
-			for (const e of edgeArray) {
-				if (e.a == i || e.b == i) {
-					continue;
-				}
-				if (nodes[i].neighbors.has(e.a)) {
-					continue;
-				}
-				if (nodes[i].neighbors.has(e.b)) {
-					continue;
-				}
-				const cp = getClosestNodePoint(e.a, e.b, i);
-				const error = nodes[i].p.sub(cp.p);
-				const l = error.len();
-				if (l < 1e-3 || l >= nodeDistanceMin) {
-					continue;
-				}
-				const n = error.div(l);
-				const v1 = nodes[e.a].v.mul(1 - cp.s).add(nodes[e.b].v.mul(cp.s));
-				const v2 = nodes[i].v;
-				const da = (nodeDistanceMin - l) * 0.6 - (n.dot(v2) - n.dot(v1));
-				if (da <= 0) {
-					continue;
-				}
-				const impulse = n.mul(da * 0.5);
-				applyImpulse(e.a, impulse.mul(-1 + cp.s));
-				applyImpulse(e.b, impulse.mul(-cp.s));
-				applyImpulse(i, impulse);
+				applyImpulse(e1.a, impulse.mul(-1 + cp.s));
+				applyImpulse(e1.b, impulse.mul(-cp.s));
+				applyImpulse(e2.a, impulse.mul(1 - cp.t));
+				applyImpulse(e2.b, impulse.mul(cp.t));
 			}
 		}
+		console.log(cdd+" "+(performance.now()-ddd));
 		finalizeImpulses();
 		for (const i in nodes) {
 			const l = nodes[i].v.len();
 			const limit = nodeRadius * 0.1;
 			if (l > limit) {
-				nodes[i].v = nodes[i].v.mul(limit / l);
+				// nodes[i].v = nodes[i].v.mul(limit / l);
 			}
 		}
 		for (const i in nodes) {
@@ -623,29 +559,6 @@ function update() {
 			}
 		}
 	}
-}
-
-function getClosestPointOnLine(p1, p2, p3) {
-	const u = p2.sub(p1);
-	const w = p3.sub(p1);
-	const l = u.lensq();
-	if (l < 1e-6) {
-		return { s: 0, p: p1 };
-	}
-	let s = w.dot(u) / l;
-	return { s, p: p1.add(u.mul(s)) };
-}
-
-function getClosestPoint(p1, p2, p3) {
-	const u = p2.sub(p1);
-	const w = p3.sub(p1);
-	const l = u.lensq();
-	if (l < 1e-6) {
-		return { s: 0, p: p1 };
-	}
-	let s = w.dot(u) / l;
-	s = Math.max(0, Math.min(1, s));
-	return { s, p: p1.add(u.mul(s)) };
 }
 
 function getClosestPoints(p1, p2, p3, p4) {
@@ -659,26 +572,28 @@ function getClosestPoints(p1, p2, p3, p4) {
 	const e = v.dot(w);
 	const D = a * c - b * b;
 	const E = 1e-6;
+	let s, t;
 	if (D < E) {
-		return null;
+		const s0 = Math.max(0, Math.min(1, a < E ? 0 : p3.sub(p1).dot(u) / a));
+		const s1 = Math.max(0, Math.min(1, a < E ? 0 : p4.sub(p1).dot(u) / a));
+		const t0 = Math.max(0, Math.min(1, c < E ? 0 : p1.sub(p3).dot(v) / c));
+		const t1 = Math.max(0, Math.min(1, c < E ? 0 : p2.sub(p3).dot(v) / c));
+		s = (s0 + s1) / 2;
+		t = (t0 + t1) / 2;
 	}
-	const s = (b * e - c * d) / D;
-	const t = (a * e - b * d) / D;
-	if (s < 0 || s > 1) {
-		return null;
-	}
-	if (t < 0 || t > 1) {
-		return null;
+	else {
+		s = (b * e - c * d) / D;
+		t = (a * e - b * d) / D;
+		if (s < 0 || s > 1) {
+			s = Math.max(0, Math.min(1, s));
+			t = (s * b + e) / c;
+		}
+		if (t < 0 || t > 1) {
+			t = Math.max(0, Math.min(1, t));
+			s = Math.max(0, Math.min(1, (t * b - d) / a));
+		}
 	}
 	return { s, t, p1: p1.add(u.mul(s)), p2: p3.add(v.mul(t)) };
-}
-
-function getClosestNodePointOnLine(a, b, c) {
-	return getClosestPointOnLine(nodes[a].p, nodes[b].p, nodes[c].p);
-}
-
-function getClosestNodePoint(a, b, c) {
-	return getClosestPoint(nodes[a].p, nodes[b].p, nodes[c].p);
 }
 
 function getClosestNodePoints(a, b, c, d) {
