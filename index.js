@@ -447,6 +447,7 @@ function update() {
 			nodeCount++;
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
+			nodes[i].neighbors = new Set();
 		}
 		function applyImpulse(i, impulse) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
@@ -515,7 +516,7 @@ function update() {
 					const l = Math.abs(error[k]);
 					if (l > 1e-3) {
 						const n = e.div(l);
-						const tv = l * 0.1 * group.length / nodeCount;
+						const tv = l * 0.1 * Math.sqrt(group.length / nodeCount);
 						const rv = n.dot(nodes[i].v);
 						const impulse = n.mul(tv - rv, 0);
 						applyImpulse(i, impulse);
@@ -539,12 +540,17 @@ function update() {
 			}
 		}
 		function getDirection(e, f) {
+			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 			const ra = e.distances[f.a];
 			const rb = e.distances[f.b];
 			if (ra == rb) {
-				return null;
+				if (rb == null) {
+					return n;
+				}
+				else {
+					return null;
+				}
 			}
-			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 			let d = 0;
 			if (ra > rb) {
 				d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
@@ -562,6 +568,7 @@ function update() {
 			edgePoints[i * 4 + 2] = nodes[e.b].p.x;
 			edgePoints[i * 4 + 3] = nodes[e.b].p.y;
 		}
+		const edgeContacts = [];
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e1 = edgeArray[i];
 			const x1 = edgePoints[i * 4 + 0], y1 = edgePoints[i * 4 + 1];
@@ -612,45 +619,66 @@ function update() {
 						continue;
 					}
 				}
-				const d = new Vector(dx, dy);
-				const l = Math.sqrt(lsq);
-				let error;
-				if (l < 1e-3) {
-					if (e1.a == e1.b || e2.a == e2.b) {
-						continue;
-					}
-					error = new Vector();
-					const d1 = getDirection(e1, e2);
-					const d2 = getDirection(e2, e1);
-					if (d1) {
-						error = error.sub(d1);
-					}
-					if (d2) {
-						error = error.add(d2);
-					}
+				edgeContacts.push([e1, e2, dx, dy, lsq, s, t]);
+				if (lsq < 1e-6 && e1.a != e2.a && e1.a != e2.b && e1.b != e2.a && e1.b != e2.b) {
+					nodes[e1.a].neighbors.add(e2);
+					nodes[e1.b].neighbors.add(e2);
+					nodes[e2.a].neighbors.add(e1);
+					nodes[e2.b].neighbors.add(e1);
 				}
-				else {
-					error = d.div(l);
-				}
-				error = error.mul(nodeDistanceMin - l);
-				const r = error.len();
-				if (r < 1e-3) {
-					continue;
-				}
-				const n = error.div(r);
-				const v1 = nodes[e1.a].v.mul(1 - s).add(nodes[e1.b].v.mul(s));
-				const v2 = nodes[e2.a].v.mul(1 - t).add(nodes[e2.b].v.mul(t));
-				const dv = v2.sub(v1);
-				const da = r * 0.6 - n.dot(dv);
-				if (da <= 0) {
-					continue;
-				}
-				const impulse = n.mul(da * 0.5);
-				applyImpulse(e1.a, impulse.mul(-1 + s));
-				applyImpulse(e1.b, impulse.mul(-s));
-				applyImpulse(e2.a, impulse.mul(1 - t));
-				applyImpulse(e2.b, impulse.mul(t));
 			}
+		}
+		for (const [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
+			const d = new Vector(dx, dy);
+			const l = Math.sqrt(lsq);
+			let error;
+			if (l < 1e-3) {
+				if (e1.a == e1.b || e2.a == e2.b) {
+					continue;
+				}
+				error = new Vector();
+				const d1 = getDirection(e1, e2);
+				const d2 = getDirection(e2, e1);
+				if (d1) {
+					error = error.sub(d1);
+				}
+				if (d2) {
+					error = error.add(d2);
+				}
+			}
+			else {
+				if (nodes[e1.a].neighbors.has(e2)) {
+					continue;
+				}
+				if (nodes[e1.b].neighbors.has(e2)) {
+					continue;
+				}
+				if (nodes[e2.a].neighbors.has(e1)) {
+					continue;
+				}
+				if (nodes[e2.b].neighbors.has(e1)) {
+					continue;
+				}
+				error = d.div(l);
+			}
+			error = error.mul(nodeDistanceMin - l);
+			const r = error.len();
+			if (r < 1e-3) {
+				continue;
+			}
+			const n = error.div(r);
+			const v1 = nodes[e1.a].v.mul(1 - s).add(nodes[e1.b].v.mul(s));
+			const v2 = nodes[e2.a].v.mul(1 - t).add(nodes[e2.b].v.mul(t));
+			const dv = v2.sub(v1);
+			const da = r * 0.6 - n.dot(dv);
+			if (da <= 0) {
+				continue;
+			}
+			const impulse = n.mul(da * 0.5);
+			applyImpulse(e1.a, impulse.mul(-1 + s));
+			applyImpulse(e1.b, impulse.mul(-s));
+			applyImpulse(e2.a, impulse.mul(1 - t));
+			applyImpulse(e2.b, impulse.mul(t));
 		}
 		finalizeImpulses();
 		for (const i in nodes) {
