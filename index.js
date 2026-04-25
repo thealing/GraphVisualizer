@@ -78,9 +78,6 @@ function onUpdate() {
 		adj[e.b] ??= [];
 		adj[e.b].push(e.a);
 	}
-	for (const e of undirectedEdges) {
-		e.nodeSides = {};
-	}
 	const distanceCache = new Map();
 	for (const e of undirectedEdges) {
 		if (!distanceCache.has(e.a)) {
@@ -101,39 +98,6 @@ function onUpdate() {
 			distanceCache.set(e.a, distances);
 		}
 		e.distances = distanceCache.get(e.a);
-	}
-	if(true) // TODO: LR test
-	{
-		for(let AT=0;AT<100000;AT++) {
-			const pos = {};
-			for (const i in nodes) {
-				pos[i] = getRandomPosition();
-			}
-			let b = false;
-			const edgeArray = Array.from(undirectedEdges);
-			for (let i = 0; i < edgeArray.length && !b; i++) {
-				for (let j = i + 1; j < edgeArray.length && !b; j++) {
-					const e1 = edgeArray[i], e2 = edgeArray[j];
-					if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
-						continue;
-					}
-					const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
-					if (cp) {
-						b = true;
-					}
-				}
-			}
-			if (!b) {
-				for (const e of undirectedEdges) {
-					const v = pos[e.b].sub(pos[e.a]).norm().left();
-					for (const i in nodes) {
-						e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
-					}
-				}
-				return;
-			}
-		}
-		console.log("NOT FOUND BRUTEFROCE");
 	}
 }
 
@@ -536,12 +500,12 @@ function update() {
 		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e1 = edgeArray[i];
+			const x1 = edgePoints[i * 4 + 0], y1 = edgePoints[i * 4 + 1];
+			const x2 = edgePoints[i * 4 + 2], y2 = edgePoints[i * 4 + 3];
 			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e2 = edgeArray[j];
 				let dx, dy, lsq, s, t;
 				{
-					const x1 = edgePoints[i * 4 + 0], y1 = edgePoints[i * 4 + 1];
-					const x2 = edgePoints[i * 4 + 2], y2 = edgePoints[i * 4 + 3];
 					const x3 = edgePoints[j * 4 + 0], y3 = edgePoints[j * 4 + 1];
 					const x4 = edgePoints[j * 4 + 2], y4 = edgePoints[j * 4 + 3];
 					const ux = x2 - x1;
@@ -620,45 +584,6 @@ function update() {
 			}
 		}
 	}
-}
-
-function getClosestPoints(p1, p2, p3, p4) {
-	const u = p2.sub(p1);
-	const v = p4.sub(p3);
-	const w = p1.sub(p3);
-	const a = u.dot(u);
-	const b = u.dot(v);
-	const c = v.dot(v);
-	const d = u.dot(w);
-	const e = v.dot(w);
-	const D = a * c - b * b;
-	const E = 1e-6;
-	let s, t;
-	if (D < E) {
-		const s0 = Math.max(0, Math.min(1, a < E ? 0 : p3.sub(p1).dot(u) / a));
-		const s1 = Math.max(0, Math.min(1, a < E ? 0 : p4.sub(p1).dot(u) / a));
-		const t0 = Math.max(0, Math.min(1, c < E ? 0 : p1.sub(p3).dot(v) / c));
-		const t1 = Math.max(0, Math.min(1, c < E ? 0 : p2.sub(p3).dot(v) / c));
-		s = (s0 + s1) / 2;
-		t = (t0 + t1) / 2;
-	}
-	else {
-		s = (b * e - c * d) / D;
-		t = (a * e - b * d) / D;
-		if (s < 0 || s > 1) {
-			s = Math.max(0, Math.min(1, s));
-			t = (s * b + e) / c;
-		}
-		if (t < 0 || t > 1) {
-			t = Math.max(0, Math.min(1, t));
-			s = Math.max(0, Math.min(1, (t * b - d) / a));
-		}
-	}
-	return { s, t, p1: p1.add(u.mul(s)), p2: p3.add(v.mul(t)) };
-}
-
-function getClosestNodePoints(a, b, c, d) {
-	return getClosestPoints(nodes[a].p, nodes[b].p, nodes[c].p, nodes[d].p);
 }
 
 function getRandomPosition() {
