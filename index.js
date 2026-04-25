@@ -244,6 +244,7 @@ function init() {
 	displaySvg.appendChild(nodesLayer);
 	displaySvg.appendChild(edgesLayer);
 	draggingBackground = false;
+	globalNodeOffset = new Vector();
 	globalSpeed = 1;
 	let lastX = 0;
 	let lastY = 0;
@@ -273,9 +274,15 @@ function init() {
 		const dy = e.clientY - lastY;
 		lastX = e.clientX;
 		lastY = e.clientY;
-		for (const i in nodes) {
-			nodes[i].p.x += dx;
-			nodes[i].p.y += dy;
+		if (manualInput.checked) {
+			globalNodeOffset.x += dx;
+			globalNodeOffset.y += dy;
+		}
+		else {
+			for (const i in nodes) {
+				nodes[i].p.x += dx;
+				nodes[i].p.y += dy;
+			}
 		}
 	});
 	window.addEventListener("touchmove", (e) => {
@@ -286,9 +293,15 @@ function init() {
 		const dy = e.touches[0].clientY - lastY;
 		lastX = e.touches[0].clientX;
 		lastY = e.touches[0].clientY;
-		for (const i in nodes) {
-			nodes[i].p.x += dx;
-			nodes[i].p.y += dy;
+		if (manualInput.checked) {
+			globalNodeOffset.x += dx;
+			globalNodeOffset.y += dy;
+		}
+		else {
+			for (const i in nodes) {
+				nodes[i].p.x += dx;
+				nodes[i].p.y += dy;
+			}
 		}
 		e.preventDefault();
 	}, { passive: false });
@@ -329,7 +342,8 @@ function update() {
 	updateInput();
 	requestAnimationFrame(update);
 	for (const i in nodes) {
-		nodes[i].svgElement.setAttribute("transform", `translate(${nodes[i].p.x}, ${nodes[i].p.y})`);
+		const position = nodes[i].p.add(globalNodeOffset);
+		nodes[i].svgElement.setAttribute("transform", `translate(${position.x}, ${position.y})`);
 		setNodeRadius(nodes[i].svgElement, nodeRadius);
 	}
 	for (const e of edges.values()) {
@@ -346,8 +360,8 @@ function update() {
 		setAttributeCache(elem.group, "visibility", "visible");
 		setAttributeCache(elem.text, "visibility", weightedEdges ? "visible" : "hidden");
 		const d = v.norm();
-		const start = nodes[a].p.add(d.mul(nodeRadius));
-		const end = nodes[b].p.sub(d.mul(nodeRadius));
+		const start = nodes[a].p.add(d.mul(nodeRadius)).add(globalNodeOffset);
+		const end = nodes[b].p.sub(d.mul(nodeRadius)).add(globalNodeOffset);
 		const x1 = start.x;
 		const y1 = start.y;
 		const x2 = end.x;
@@ -422,7 +436,11 @@ function update() {
 	const dt = speed;
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
-	const edgeArray = undirectedEdges;
+	const edgeArray = Array.from(undirectedEdges);
+	for (const i in nodes) {
+		const e = new Edge(i, i, 0, true);
+		edgeArray.push(e);
+	}
 	for (let s = 0; s < subSteps; s++) {
 		let nodeCount = 0;
 		for (const i in nodes) {
@@ -506,7 +524,6 @@ function update() {
 			if (rb > ra) {
 				d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
 			}
-			//d += Math.sign(d) * nodeDistanceMin;
 			return n.mul(Math.sign(d));
 		}
 		const edgePoints = new Float64Array(edgeArray.length * 4);
