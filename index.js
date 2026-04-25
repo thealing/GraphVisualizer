@@ -78,16 +78,6 @@ function onUpdate() {
 		adj[e.b] ??= [];
 		adj[e.b].push(e.a);
 	}
-	for (const i in nodes) {
-		nodes[i].hinge = false;
-	}
-	for (const i in nodes) {
-		if (adj[i].length == 2) {
-			for (const j of adj[i]) {
-				nodes[j].hinge = true;
-			}
-		}
-	}
 	for (const e of undirectedEdges) {
 		const queue = [e.a, e.b];
 		const distances = [];
@@ -105,10 +95,11 @@ function onUpdate() {
 			}
 		}
 		e.distances = distances;
+		e.nodeSides = {};
 	}
 	
 	// LR TEST
-	if(true) // TODO: LR test
+	if(false) // TODO: LR test
 	{
 		function getClosestPoints(p1, p2, p3, p4) {
 			const u = p2.sub(p1);
@@ -167,7 +158,8 @@ function onUpdate() {
 				for (const e of undirectedEdges) {
 					const v = pos[e.b].sub(pos[e.a]).norm().left();
 					for (const i in nodes) {
-						e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
+						if(adj[i].includes(e.a) || adj[i].includes(e.b))
+							e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
 					}
 				}
 				return;
@@ -623,29 +615,39 @@ function update() {
 				return n;
 			}
 			let d = 0;
-			if (nodes[f.a].hinge || ra > rb) {
+			if (ra > rb) {
 				d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
 			}
-			if (nodes[f.b].hinge || rb > ra) {
+			if (rb > ra) {
 				d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
 			}
 			return n.mul(Math.sign(d));
 		}
 		const edgePoints = new Float64Array(edgeArray.length * 4);
+		const edgeNodes = new Float64Array(edgeArray.length * 2);
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e = edgeArray[i];
 			edgePoints[i * 4 + 0] = nodes[e.a].p.x;
 			edgePoints[i * 4 + 1] = nodes[e.a].p.y;
 			edgePoints[i * 4 + 2] = nodes[e.b].p.x;
 			edgePoints[i * 4 + 3] = nodes[e.b].p.y;
+			edgeNodes[i * 2 + 0] = Number(e.a);
+			edgeNodes[i * 2 + 1] = Number(e.b);
 		}
 		const edgeContacts = [];
 		for (let i = 0; i < edgeArray.length; i++) {
-			const e1 = edgeArray[i];
 			const x1 = edgePoints[i * 4 + 0], y1 = edgePoints[i * 4 + 1];
 			const x2 = edgePoints[i * 4 + 2], y2 = edgePoints[i * 4 + 3];
+			const na1 = edgeNodes[i * 2 + 0], nb1 = edgeNodes[i * 2 + 1];
 			for (let j = i + 1; j < edgeArray.length; j++) {
-				const e2 = edgeArray[j];
+				const na2 = edgeNodes[j * 2 + 0];
+				if (na1 == na2 || nb1 == na2) {
+					continue;
+				}
+				const nb2 = edgeNodes[j * 2 + 1];
+				if (na1 == nb2 || nb1 == nb2) {
+					continue;
+				}
 				let dx, dy, lsq, s, t;
 				{
 					const x3 = edgePoints[j * 4 + 0], y3 = edgePoints[j * 4 + 1];
@@ -659,28 +661,72 @@ function update() {
 					const a = ux * ux + uy * uy;
 					const b = ux * vx + uy * vy;
 					const c = vx * vx + vy * vy;
-					const d = ux * wx + uy * wy;
-					const e = vx * wx + vy * wy;
 					const D = a * c - b * b;
 					const E = 1e-6;
 					if (D < E) {
-						const s0 = Math.max(0, Math.min(1, a < E ? 0 : ((x3 - x1) * ux + (y3 - y1) * uy) / a));
-						const s1 = Math.max(0, Math.min(1, a < E ? 0 : ((x4 - x1) * ux + (y4 - y1) * uy) / a));
-						const t0 = Math.max(0, Math.min(1, c < E ? 0 : ((x1 - x3) * vx + (y1 - y3) * vy) / c));
-						const t1 = Math.max(0, Math.min(1, c < E ? 0 : ((x2 - x3) * vx + (y2 - y3) * vy) / c));
-						s = (s0 + s1) / 2;
-						t = (t0 + t1) / 2;
+						const aZero = a < E;
+						const bZero = c < E;
+						if (aZero && bZero) {
+							s = 0;
+							t = 0;
+						}
+						else if (aZero) {
+							s = 0;
+							t = ((x1 - x3) * vx + (y1 - y3) * vy) / c;
+							if (t < 0) {
+								t = 0;
+							}
+							if (t > 1) {
+								t = 1;
+							}
+						}
+						else if (bZero) {
+							s = ((x3 - x1) * ux + (y3 - y1) * uy) / a;
+							t = 0;
+							if (s < 0) {
+								s = 0;
+							}
+							if (s > 1) {
+								s = 1;
+							}
+						}
+						else {
+							continue;
+						}
 					}
 					else {
-						s = (b * e - c * d) / D;
-						t = (a * e - b * d) / D;
-						if (s < 0 || s > 1) {
-							s = Math.max(0, Math.min(1, s));
+						const d = ux * wx + uy * wy;
+						const e = vx * wx + vy * wy;
+						const invD = 1 / D;
+						s = (b * e - c * d) * invD;
+						t = (a * e - b * d) * invD;
+						if (s < 0) {
+							s = 0;
 							t = (s * b + e) / c;
 						}
-						if (t < 0 || t > 1) {
-							t = Math.max(0, Math.min(1, t));
-							s = Math.max(0, Math.min(1, (t * b - d) / a));
+						if (s > 1) {
+							s = 1;
+							t = (s * b + e) / c;
+						}
+						if (t < 0) {
+							t = 0;
+							s = (t * b - d) / a;
+							if (s < 0) {
+								s = 0;
+							}
+							if (s > 1) {
+								s = 1;
+							}
+						}
+						if (t > 1) {
+							t = 1;
+							s = (t * b - d) / a;
+							if (s < 0) {
+								s = 0;
+							}
+							if (s > 1) {
+								s = 1;
+							}
 						}
 					}
 					dx = (x3 + vx * t) - (x1 + ux * s);
@@ -690,8 +736,10 @@ function update() {
 						continue;
 					}
 				}
+				const e1 = edgeArray[i];
+				const e2 = edgeArray[j];
 				edgeContacts.push([e1, e2, dx, dy, lsq, s, t]);
-				if (lsq < 1e-6 && e1.a != e2.a && e1.a != e2.b && e1.b != e2.a && e1.b != e2.b) {
+				if (lsq < 1e-6) {
 					nodes[e1.a].neighbors.add(e2);
 					nodes[e1.b].neighbors.add(e2);
 					nodes[e2.a].neighbors.add(e1);
@@ -745,45 +793,45 @@ function update() {
 			applyImpulse(e2.a, impulse.mul(1 - t));
 			applyImpulse(e2.b, impulse.mul(t));
 		}
-		for (const u in nodes) {
-			const nb = adj[u];
-			const n = nb.length;
-			if (n < 3) {
-				continue;
-			}
-			const targetAngle = (Math.PI * 2) / n;
-			for (let i = 0; i < n; i++) {
-				for (let j = i + 1; j < n; j++) {
-					const v1 = nb[i];
-					const v2 = nb[j];
-					const dx1 = nodes[v1].p.x - nodes[u].p.x;
-					const dy1 = nodes[v1].p.y - nodes[u].p.y;
-					const dx2 = nodes[v2].p.x - nodes[u].p.x;
-					const dy2 = nodes[v2].p.y - nodes[u].p.y;
-					const angle1 = Math.atan2(dy1, dx1);
-					const angle2 = Math.atan2(dy2, dx2);
-					let currentAngle = (angle2 - angle1) % (Math.PI * 2);
-					if (currentAngle < 0) {
-						currentAngle += Math.PI * 2;
-					}
-					let error = targetAngle * (j - i) - currentAngle;
-					const d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) + 1e-6;
-					const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) + 1e-6;
-					const tx1 = -dy1 / d1, ty1 = dx1 / d1;
-					const tx2 = -dy2 / d2, ty2 = dx2 / d2;
-					const rv1 = ((nodes[v1].v.x - nodes[u].v.x) * tx1 + (nodes[v1].v.y - nodes[u].v.y) * ty1) / d1;
-					const rv2 = ((nodes[v2].v.x - nodes[u].v.x) * tx2 + (nodes[v2].v.y - nodes[u].v.y) * ty2) / d2;
-					const rv = rv2 - rv1;
-					const da = error * 0.2 / n - rv;
-					const l = da * 0.5;
-					const imp1 = new Vector(tx1 * -l * d1, ty1 * -l * d1);
-					const imp2 = new Vector(tx2 * l * d2, ty2 * l * d2);
-					applyImpulse(v1, imp1);
-					applyImpulse(v2, imp2);
-					applyImpulse(u, imp1.add(imp2).neg());
-				}
-			}
-		}
+		// for (const u in nodes) {
+			// const nb = adj[u];
+			// const n = nb.length;
+			// if (n < 3) {
+				// continue;
+			// }
+			// const targetAngle = (Math.PI * 2) / n;
+			// for (let i = 0; i < n; i++) {
+				// for (let j = i + 1; j < n; j++) {
+					// const v1 = nb[i];
+					// const v2 = nb[j];
+					// const dx1 = nodes[v1].p.x - nodes[u].p.x;
+					// const dy1 = nodes[v1].p.y - nodes[u].p.y;
+					// const dx2 = nodes[v2].p.x - nodes[u].p.x;
+					// const dy2 = nodes[v2].p.y - nodes[u].p.y;
+					// const angle1 = Math.atan2(dy1, dx1);
+					// const angle2 = Math.atan2(dy2, dx2);
+					// let currentAngle = (angle2 - angle1) % (Math.PI * 2);
+					// if (currentAngle < 0) {
+						// currentAngle += Math.PI * 2;
+					// }
+					// let error = targetAngle * (j - i) - currentAngle;
+					// const d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) + 1e-6;
+					// const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) + 1e-6;
+					// const tx1 = -dy1 / d1, ty1 = dx1 / d1;
+					// const tx2 = -dy2 / d2, ty2 = dx2 / d2;
+					// const rv1 = ((nodes[v1].v.x - nodes[u].v.x) * tx1 + (nodes[v1].v.y - nodes[u].v.y) * ty1) / d1;
+					// const rv2 = ((nodes[v2].v.x - nodes[u].v.x) * tx2 + (nodes[v2].v.y - nodes[u].v.y) * ty2) / d2;
+					// const rv = rv2 - rv1;
+					// const da = error * 0.2 / n - rv;
+					// const l = da * 0.5;
+					// const imp1 = new Vector(tx1 * -l * d1, ty1 * -l * d1);
+					// const imp2 = new Vector(tx2 * l * d2, ty2 * l * d2);
+					// applyImpulse(v1, imp1);
+					// applyImpulse(v2, imp2);
+					// applyImpulse(u, imp1.add(imp2).neg());
+				// }
+			// }
+		// }
 		finalizeImpulses();
 		for (const i in nodes) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
