@@ -527,16 +527,66 @@ function update() {
 			}
 		}
 		let cdd=0,ddd=performance.now();
+		const edgePoints = new Float64Array(edgeArray.length * 4);
+		for (let i = 0; i < edgeArray.length; i++) {
+			const e = edgeArray[i];
+			edgePoints[i * 4 + 0] = nodes[e.a].p.x;
+			edgePoints[i * 4 + 1] = nodes[e.a].p.y;
+			edgePoints[i * 4 + 2] = nodes[e.b].p.x;
+			edgePoints[i * 4 + 3] = nodes[e.b].p.y;
+		}
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e1 = edgeArray[i];
 			for (let j = i + 1; j < edgeArray.length; j++) {
 				const e2 = edgeArray[j];cdd++;
-				const cp = getClosestNodePoints(e1.a, e1.b, e2.a, e2.b);
-				const d = cp.p2.sub(cp.p1);
-				const l = d.len();
-				if (l >= nodeDistanceMin) {
-					continue;
+				let dx, dy, lsq, s, t;
+				{
+					const x1 = edgePoints[i * 4 + 0], y1 = edgePoints[i * 4 + 1];
+					const x2 = edgePoints[i * 4 + 2], y2 = edgePoints[i * 4 + 3];
+					const x3 = edgePoints[j * 4 + 0], y3 = edgePoints[j * 4 + 1];
+					const x4 = edgePoints[j * 4 + 2], y4 = edgePoints[j * 4 + 3];
+					const ux = x2 - x1;
+					const uy = y2 - y1;
+					const vx = x4 - x3;
+					const vy = y4 - y3;
+					const wx = x1 - x3;
+					const wy = y1 - y3;
+					const a = ux * ux + uy * uy;
+					const b = ux * vx + uy * vy;
+					const c = vx * vx + vy * vy;
+					const d = ux * wx + uy * wy;
+					const e = vx * wx + vy * wy;
+					const D = a * c - b * b;
+					const E = 1e-6;
+					if (D < E) {
+						const s0 = Math.max(0, Math.min(1, a < E ? 0 : ((x3 - x1) * ux + (y3 - y1) * uy) / a));
+						const s1 = Math.max(0, Math.min(1, a < E ? 0 : ((x4 - x1) * ux + (y4 - y1) * uy) / a));
+						const t0 = Math.max(0, Math.min(1, c < E ? 0 : ((x1 - x3) * vx + (y1 - y3) * vy) / c));
+						const t1 = Math.max(0, Math.min(1, c < E ? 0 : ((x2 - x3) * vx + (y2 - y3) * vy) / c));
+						s = (s0 + s1) / 2;
+						t = (t0 + t1) / 2;
+					}
+					else {
+						s = (b * e - c * d) / D;
+						t = (a * e - b * d) / D;
+						if (s < 0 || s > 1) {
+							s = Math.max(0, Math.min(1, s));
+							t = (s * b + e) / c;
+						}
+						if (t < 0 || t > 1) {
+							t = Math.max(0, Math.min(1, t));
+							s = Math.max(0, Math.min(1, (t * b - d) / a));
+						}
+					}
+					dx = (x3 + vx * t) - (x1 + ux * s);
+					dy = (y3 + vy * t) - (y1 + uy * s);
+					lsq = dx * dx + dy * dy;
+					if (lsq >= nodeDistanceMin * nodeDistanceMin) {
+						continue;
+					}
 				}
+				const d = new Vector(dx, dy);
+				const l = Math.sqrt(lsq);
 				let error;
 				if (l < 1e-3) {
 					error = nodes[e1.b].p.sub(nodes[e1.a].p).norm().left();
@@ -550,18 +600,18 @@ function update() {
 					continue;
 				}
 				const n = error.div(r);
-				const v1 = nodes[e1.a].v.mul(1 - cp.s).add(nodes[e1.b].v.mul(cp.s));
-				const v2 = nodes[e2.a].v.mul(1 - cp.t).add(nodes[e2.b].v.mul(cp.t));
+				const v1 = nodes[e1.a].v.mul(1 - s).add(nodes[e1.b].v.mul(s));
+				const v2 = nodes[e2.a].v.mul(1 - t).add(nodes[e2.b].v.mul(t));
 				const dv = v2.sub(v1);
 				const da = r * 0.8 - n.dot(dv);
 				if (da <= 0) {
 					continue;
 				}
 				const impulse = n.mul(da * 0.5);
-				applyImpulse(e1.a, impulse.mul(-1 + cp.s));
-				applyImpulse(e1.b, impulse.mul(-cp.s));
-				applyImpulse(e2.a, impulse.mul(1 - cp.t));
-				applyImpulse(e2.b, impulse.mul(cp.t));
+				applyImpulse(e1.a, impulse.mul(-1 + s));
+				applyImpulse(e1.b, impulse.mul(-s));
+				applyImpulse(e2.a, impulse.mul(1 - t));
+				applyImpulse(e2.b, impulse.mul(t));
 			}
 		}
 		console.log(cdd+" "+(performance.now()-ddd));
