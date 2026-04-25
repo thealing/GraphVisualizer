@@ -526,7 +526,6 @@ function update() {
 				applyImpulse(b, impulse);
 			}
 		}
-		let cdd=0,ddd=performance.now();
 		const edgePoints = new Float64Array(edgeArray.length * 4);
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e = edgeArray[i];
@@ -614,7 +613,6 @@ function update() {
 				applyImpulse(e2.b, impulse.mul(t));
 			}
 		}
-		console.log(cdd+" "+(performance.now()-ddd));
 		finalizeImpulses();
 		for (const i in nodes) {
 			const l = nodes[i].v.len();
