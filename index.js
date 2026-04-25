@@ -121,7 +121,7 @@ function replaceEdges(lines) {
 
 function onRandom() {
 	updateInput();
-	const n = Number(exampleCountInput.value);
+	const n = clampValue(exampleCountInput);
 	if (n <= 1) {
 		replaceEdges("");
 		return;
@@ -214,7 +214,7 @@ function onRandom() {
 }
 
 function onApply() {
-	globalSpeed = Number(speedInput.value);
+	globalSpeed = clampValue(speedInput);
 	nodeRadius = Number(nodeSizeInput.value);
 	nodeDistanceMin = Number(nodeMarginInput.value);
 	nodeDistanceMin += nodeRadius * 2;
@@ -712,6 +712,20 @@ function addEdge(a, b, w) {
 	else {
 		edges.set(k, new Edge(a, b, w));
 	}
+}
+
+function clampValue(numericInput) {
+	const min = parseFloat(numericInput.getAttribute('min')) ?? -Infinity;
+	const max = parseFloat(numericInput.getAttribute('max')) ?? Infinity;
+	let value = parseFloat(numericInput.value);
+	if (isNaN(value)) {
+		value = 0;
+	}
+	value = Math.max(min, Math.min(max, value));
+	if (numericInput.value != value) {
+		numericInput.value = value;
+	}
+	return value;
 }
 
 function setAttributeCache(e, attribute, value) {
