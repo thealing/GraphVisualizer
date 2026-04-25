@@ -408,31 +408,46 @@ function update() {
 	const stepSize = dt / subSteps;
 	const edgeArray = Array.from(edges.values());
 	for (const i in nodes) {
-		edgeArray.push({ a: i, b: i });
+		edgeArray.push(new Edge(i, i, 0, true));
 	}
 	for (let s = 0; s < subSteps; s++) {
+		let nodeCount = 0;
 		for (const i in nodes) {
+			nodeCount++;
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
+		}
+		const impulseLimit = nodeRadius * 1.2;
+		function applyImpulse(i, impulse) {
+			if (!nodes[i].dragging && !nodes[i].fixed) {
+				const l = impulse.len();
+				if (l > 1e-3) {
+					if (l > impulseLimit) {
+						impulse = impulse.mul(impulseLimit / l);
+					}
+					nodes[i].a = nodes[i].a.add(impulse);
+					nodes[i].ac++;
+				}
+			}
 		}
 		for (const i in nodes) {
 			const center = new Vector(displayWidth / 2, displayHeight / 2);
 			const dir = center.sub(nodes[i].p);
-			const extend = displayWidth + displayHeight;
-			const scale = new Vector(dir.x * displayHeight, dir.y * displayWidth).div(extend);
+			const distance = dir.len();
+			const width2 = displayWidth * displayWidth;
+			const height2 = displayHeight * displayHeight;
+			const denom = width2 + height2;
+			const error = new Vector(dir.x * height2 / denom, dir.y * width2 / denom);
 			for (const k of ['x', 'y']) {
-				const error = new Vector();
-				error[k] = scale[k];
-				let l = error.len();
+				const e = new Vector();
+				e[k] = error[k];
+				const l = Math.abs(error[k]);
 				if (l > 1e-3) {
-					const n = error.div(l);
-					const tv = error.mul(0.1);
-					const rv = n.mul(n.dot(nodes[i].v));
-					const impulse = tv.sub(rv);
-					if (!nodes[i].dragging && !nodes[i].fixed) {
-						nodes[i].a = nodes[i].a.add(impulse);
-						nodes[i].ac++;
-					}
+					const n = e.div(l);
+					const tv = l * 0.1 / Math.sqrt(nodeCount);
+					const rv = n.dot(nodes[i].v);
+					const impulse = n.mul(Math.max(tv - rv, 0));
+					applyImpulse(i, impulse);
 				}
 			}
 		}
@@ -447,14 +462,8 @@ function update() {
 				const tv = error.mul(0.4);
 				const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
 				const impulse = tv.sub(rv).mul(0.5);
-				if (!nodes[a].dragging && !nodes[a].fixed) {
-					nodes[a].a = nodes[a].a.sub(impulse);
-					nodes[a].ac++;
-				}
-				if (!nodes[b].dragging && !nodes[b].fixed) {
-					nodes[b].a = nodes[b].a.add(impulse);
-					nodes[b].ac++;
-				}
+				applyImpulse(a, impulse.neg());
+				applyImpulse(b, impulse);
 			}
 		}
 		const range = edgeArray.length;
@@ -515,7 +524,7 @@ function update() {
 					dfs(j);
 				}
 			}
-			// dfs(e.a);
+			dfs(e.a);
 			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 			let d = 0;
 			if (!ra) {
@@ -538,7 +547,7 @@ function update() {
 			if (l < 1e-3) {
 				const d1 = getDirection(e2, i2, e1);
 				const d2 = getDirection(e1, i1, e2);
-				// dir = d1.sub(d2);
+				dir = d1.sub(d2);
 			}
 			else {
 				if (nodes[e1.a].contactEdges.has(e2)) {
@@ -568,27 +577,22 @@ function update() {
 			if (da <= 0) {
 				continue;
 			}
-			const impulse = n.mul(da).mul(0.5);
-			if (!nodes[e1.a].dragging && !nodes[e1.a].fixed) {
-				nodes[e1.a].a = nodes[e1.a].a.sub(impulse.mul(1 - cp.s));
-				nodes[e1.a].ac++;
-			}
-			if (!nodes[e1.b].dragging && !nodes[e1.b].fixed) {
-				nodes[e1.b].a = nodes[e1.b].a.sub(impulse.mul(cp.s));
-				nodes[e1.b].ac++;
-			}
-			if (!nodes[e2.a].dragging && !nodes[e2.a].fixed) {
-				nodes[e2.a].a = nodes[e2.a].a.add(impulse.mul(1 - cp.t));
-				nodes[e2.a].ac++;
-			}
-			if (!nodes[e2.b].dragging && !nodes[e2.b].fixed) {
-				nodes[e2.b].a = nodes[e2.b].a.add(impulse.mul(cp.t));
-				nodes[e2.b].ac++;
+			const impulse = n.mul(da).mul(0.8);
+			applyImpulse(e1.a, impulse.mul(-1 + cp.s));
+			applyImpulse(e1.b, impulse.mul(-cp.s));
+			applyImpulse(e2.a, impulse.mul(1 - cp.t));
+			applyImpulse(e2.b, impulse.mul(cp.t));
+		}
+		for (const i in nodes) {
+			nodes[i].v = nodes[i].v.add(nodes[i].a.mul(stepSize / nodes[i].ac));
+			const l = nodes[i].v.len();
+			const limit = nodeRadius * 0.7;
+			if (l > limit) {
+				nodes[i].v = nodes[i].v.mul(limit / l);
 			}
 		}
 		for (const i in nodes) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
-				nodes[i].v = nodes[i].v.add(nodes[i].a.mul(stepSize / nodes[i].ac));
 				nodes[i].p = nodes[i].p.add(nodes[i].v.mul(stepSize));
 			}
 		}
@@ -769,13 +773,15 @@ function Node(x, y, i) {
 	});
 }
 
-function Edge(a, b, weight) {
+function Edge(a, b, weight, headless) {
 	this.a = a;
 	this.b = b;
-	this.weight = weight;
-	this.gen = 1;
-	this.svgElement = createSvgEdge();
-	this.arrow = createSvgArrow();
+	if (!headless) {
+		this.weight = weight;
+		this.gen = 1;
+		this.svgElement = createSvgEdge();
+		this.arrow = createSvgArrow();
+	}
 }
 
 function randomInt(min, max) {
