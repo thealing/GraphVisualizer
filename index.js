@@ -471,23 +471,23 @@ function update() {
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
 		}
-		const impulseLimit = nodeRadius * 0.5;
 		function applyImpulse(i, impulse) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
-				const l = impulse.len();
-				if (l > 1e-3) {
-					// if (l > impulseLimit) {
-						// impulse = impulse.mul(impulseLimit / l);
-					// }
-					nodes[i].a = nodes[i].a.add(impulse);
-					nodes[i].ac++;
-				}
+				nodes[i].a = nodes[i].a.add(impulse);
+				nodes[i].ac++;
 			}
 		}
 		function finalizeImpulses() {
 			for (const i in nodes) {
 				nodes[i].v = nodes[i].v.add(nodes[i].a.mul(stepSize / nodes[i].ac));
 				nodes[i].ac = 0;
+			}
+			for (const i in nodes) {
+				const l = nodes[i].v.len();
+				const limit = nodeRadius * 0.7;
+				if (l > limit) {
+					nodes[i].v = nodes[i].v.mul(limit / l);
+				}
 			}
 		}
 		for (const i in nodes) {
@@ -504,7 +504,7 @@ function update() {
 				const l = Math.abs(error[k]);
 				if (l > 1e-3) {
 					const n = e.div(l);
-					const tv = l * 0.2 / Math.sqrt(nodeCount);
+					const tv = l * 0.3 / Math.sqrt(nodeCount);
 					const rv = n.dot(nodes[i].v);
 					const impulse = n.mul(Math.max(tv - rv, 0));
 					applyImpulse(i, impulse);
@@ -537,7 +537,7 @@ function update() {
 		for (let i = 0; i < edgeArray.length; i++) {
 			const e1 = edgeArray[i];
 			for (let j = i + 1; j < edgeArray.length; j++) {
-				const e2 = edgeArray[j];cdd++;
+				const e2 = edgeArray[j];
 				let dx, dy, lsq, s, t;
 				{
 					const x1 = edgePoints[i * 4 + 0], y1 = edgePoints[i * 4 + 1];
@@ -602,7 +602,7 @@ function update() {
 				const v1 = nodes[e1.a].v.mul(1 - s).add(nodes[e1.b].v.mul(s));
 				const v2 = nodes[e2.a].v.mul(1 - t).add(nodes[e2.b].v.mul(t));
 				const dv = v2.sub(v1);
-				const da = r * 0.8 - n.dot(dv);
+				const da = r * 0.6 - n.dot(dv);
 				if (da <= 0) {
 					continue;
 				}
@@ -614,13 +614,6 @@ function update() {
 			}
 		}
 		finalizeImpulses();
-		for (const i in nodes) {
-			const l = nodes[i].v.len();
-			const limit = nodeRadius * 0.1;
-			if (l > limit) {
-				// nodes[i].v = nodes[i].v.mul(limit / l);
-			}
-		}
 		for (const i in nodes) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
 				nodes[i].p = nodes[i].p.add(nodes[i].v.mul(stepSize));
