@@ -44,14 +44,11 @@ function isPlanar(nodes, edges) {
 			dfs1(i, -1);
 		}
 	}
-	console.log(v);
-	let ss=""
-	for(let i = 0; i < edges.length;i++)ss+="("+edges[i][0]+", "+edges[i][1]+") : "+w[i]+" | ";
-	console.log(ss);
-	ss="";
-	for(let i = 0; i < edges.length;i++)ss+=edges[i][0]+", "+edges[i][1]+" : "+u[i]+" | ";
-	console.log(ss);
 	for (const i of nodes) {
+		function isDirectedEdge(p) {
+			const j = p[0];
+			return f.has(p[1]) ? v[j] == v[i] + 1 : v[j] < v[i] - 1;
+		}
 		function getOrder(e) {
 			let order = w[e] * 2;
 			if (f.has(e) && u[e] < v[i]) {
@@ -59,6 +56,7 @@ function isPlanar(nodes, edges) {
 			}
 			return order;
 		}
+		adj[i] = adj[i].filter(isDirectedEdge);
 		adj[i].sort((a, b) => getOrder(a[1]) - getOrder(b[1]));
 	}
 	function getLowestEnd(p) {
