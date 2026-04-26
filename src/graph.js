@@ -1,11 +1,13 @@
 function isPlanar(nodes, edges) {
 	const adj = [];
+	const sides = new Array(edges.length);
 	for (let i = 0; i < edges.length; i++) {
 		const [a, b] = edges[i];
 		adj[a] ??= [];
 		adj[a].push([b, i]);
 		adj[b] ??= [];
 		adj[b].push([a, i]);
+		sides[i] = 1;
 	}
 	const v = [];
 	const w = [];
@@ -44,10 +46,6 @@ function isPlanar(nodes, edges) {
 			dfs1(i, -1);
 		}
 	}
-	// console.log(v);
-	// let ss=""
-	// for(let i = 0; i < edges.length;i++)ss+="("+edges[i][0]+", "+edges[i][1]+") : "+w[i]+" | ";
-	// console.log(ss);
 	for (const i of nodes) {
 		function isDirectedEdge(p) {
 			const j = p[0];
@@ -61,7 +59,7 @@ function isPlanar(nodes, edges) {
 			return order;
 		}
 		adj[i] = adj[i].filter(isDirectedEdge);
-		adj[i].sort((a, b) => getOrder(a[1]) - getOrder(b[1]) || a[0] - b[0]);
+		adj[i].sort((a, b) => getOrder(a[1]) - getOrder(b[1]));
 	}
 	function Interval(l, h) {
 		this.l = l ?? -1;
@@ -98,7 +96,6 @@ function isPlanar(nodes, edges) {
 	}
 	let result = true;
 	function addConstraints(e1, e2, sb) {
-		// console.log("ENTER " + edges[e1]?.join() + " " + edges[e2]?.join() + " " + s.length);
 		const pr = new Interval();
 		do {
 			const q = s.pop();
@@ -140,11 +137,9 @@ function isPlanar(nodes, edges) {
 		if (!pl.empty() || !pr.empty()) {
 			const p = [pl, pr];
 			s.push(p);
-			// console.log("ADDED " + edges[p[0].l]?.join() + " " + edges[p[0].h]?.join() + " - " + edges[p[1].l]?.join() + " " + edges[p[1].h]?.join());
 		}
 	}
 	function removeConstraints(n) {
-		// console.log("LEAVE " + n);
 		while (true) {
 			if (s.length == 0) {
 				return;
@@ -154,8 +149,11 @@ function isPlanar(nodes, edges) {
 				break;
 			}
 			s.pop();
+			const e = q[0].l;
+			if (e != -1) {
+				sides[e] = -1;
+			}
 		}
-		// console.log("SIZE ONE " + s.length);
 		const q = s.top();
 		for (let i = 0; i < 2; i++) {
 			while (true) {
@@ -163,6 +161,7 @@ function isPlanar(nodes, edges) {
 				if (e == -1) {
 					const f = q[i].l;
 					if (f != -1) {
+						sides[f] = -1;
 						r[f] = q[1 - i].l;
 						q[i].l = -1;
 					}
@@ -174,7 +173,6 @@ function isPlanar(nodes, edges) {
 				q[i].h = r[e] ?? -1;
 			}
 		}
-		// console.log("SIZE TWO " + s.length);
 	}
 	function dfs2(n1, e1) {
 		let first = true;
@@ -219,11 +217,40 @@ function isPlanar(nodes, edges) {
 		if (v[i] == 0) {
 			dfs2(i, -1);
 			if (result == false) {
-				break;
+				return null;
 			}
 		}
 	}
-	// console.clear();
-	// console.log(result);
-	return result;
+	const windings = [];
+	function setWinding(e) {
+		if (windings[e] != null) {
+			return;
+		}
+		windings[e] = sides[e];
+		if (r[e] >= 0) {
+			const p = r[e];
+			setWinding(p);
+			windings[e] *= windings[p];
+		}
+	}
+	for (let i = 0; i < edges.length; i++) {
+		setWinding(i);
+	}
+	const separator = nodes.length * nodes.length;
+	for (const i of nodes) {
+		function getOrder(e) {
+			let order = w[e] * 2;
+			if (f.has(e)) {
+				if (u[e] < v[i]) {
+					order += 1;
+				}
+			}
+			else {
+				order = (order + separator) * windings[e];
+			}
+			return order;
+		}
+		adj[i].sort((a, b) => getOrder(a[1]) - getOrder(b[1]));
+	}
+	return { adj, windings };
 }

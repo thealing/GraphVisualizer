@@ -96,91 +96,11 @@ function onUpdate() {
 		e.distances = distances;
 		e.nodeSides = {};
 	}
-	isPlanar(Object.keys(nodes), undirectedEdges.map(e => [e.a, e.b]));
-	
-	// LR TEST
-	if(false) // TODO: LR test
-	{
-		function getClosestPoints(p1, p2, p3, p4) {
-			const u = p2.sub(p1);
-			const v = p4.sub(p3);
-			const w = p1.sub(p3);
-			const a = u.dot(u);
-			const b = u.dot(v);
-			const c = v.dot(v);
-			const d = u.dot(w);
-			const e = v.dot(w);
-			const D = a * c - b * b;
-			const E = 1e-6;
-			let s, t;
-			if (D < E) {
-				const s0 = Math.max(0, Math.min(1, a < E ? 0 : p3.sub(p1).dot(u) / a));
-				const s1 = Math.max(0, Math.min(1, a < E ? 0 : p4.sub(p1).dot(u) / a));
-				const t0 = Math.max(0, Math.min(1, c < E ? 0 : p1.sub(p3).dot(v) / c));
-				const t1 = Math.max(0, Math.min(1, c < E ? 0 : p2.sub(p3).dot(v) / c));
-				s = (s0 + s1) / 2;
-				t = (t0 + t1) / 2;
-			}
-			else {
-				s = (b * e - c * d) / D;
-				t = (a * e - b * d) / D;
-				if (s < 0 || s > 1) {
-					s = Math.max(0, Math.min(1, s));
-					t = (s * b + e) / c;
-				}
-				if (t < 0 || t > 1) {
-					t = Math.max(0, Math.min(1, t));
-					s = Math.max(0, Math.min(1, (t * b - d) / a));
-				}
-			}
-			return { s, t, p1: p1.add(u.mul(s)), p2: p3.add(v.mul(t)) };
-		}
-		
-		requestAnimationFrame(()=>{
-			exampleCountInput.value=12;
-			onRandom();
-			let bfres=false;
-			const fastResult = isPlanar(Object.keys(nodes), undirectedEdges.map(e => [e.a, e.b]));
-			for(let AT=0;fastResult||AT<100000;AT++) {
-				const pos = {};
-				for (const i in nodes) {
-					pos[i] = getRandomPosition();
-				}
-				let b = false;
-				const edgeArray = Array.from(undirectedEdges);
-				for (let i = 0; i < edgeArray.length && !b; i++) {
-					for (let j = i + 1; j < edgeArray.length && !b; j++) {
-						const e1 = edgeArray[i], e2 = edgeArray[j];
-						if (e1.a == e2.a || e1.a == e2.b || e1.b == e2.a || e1.b == e2.b) {
-							continue;
-						}
-						const cp = getClosestPoints(pos[e1.a], pos[e1.b], pos[e2.a], pos[e2.b]);
-						if (cp.p2.sub(cp.p1).len()<1e-3) {
-							b = true;
-						}
-					}
-				}
-				if (!b) {
-					// for (const e of undirectedEdges) {
-						// const v = pos[e.b].sub(pos[e.a]).norm().left();
-						// for (const i in nodes) {
-							// if(adj[i].includes(e.a) || adj[i].includes(e.b))
-								// e.nodeSides[i] = v.dot(pos[i].sub(pos[e.a])) > 0 ? 1 : -1;
-						// }
-					// }
-					bfres=true;
-					break;
-				}
-			}
-			if(typeof totalC=="undefined")totalC=0;
-			totalC++;
-			if(fastResult!=bfres){
-				console.log("DIFFERENT " + fastResult+" "+bfres);
-			}
-			else if(totalC%20==0){
-				console.log("OK " + fastResult+" "+bfres);
-			}
-		});
+	const nodeCollection = Object.keys(nodes);
+	const planarEdges = undirectedEdges.map(e => [e.a, e.b]);
+	const planar = isPlanar(nodeCollection, planarEdges);
+	if (planar) {
+		console.log(planar);
 	}
 }
 
