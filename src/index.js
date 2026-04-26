@@ -477,9 +477,10 @@ function update() {
 			elem.line.setAttribute("x2", end.x);
 			elem.line.setAttribute("y2", end.y);
 		}
-		if (elem.textStringContent != e.weight) {
-			elem.textStringContent = e.weight;
-			elem.text.textContent = e.weight;
+		const w = e.weight ?? "";
+		if (elem.textStringContent != w) {
+			elem.textStringContent = w;
+			elem.text.textContent = w;
 		}
 		setAttributeCache(elem.text, "font-size", nodeRadius / 2);
 		setAttributeCache(elem.line, "stroke-width", Math.min(nodeRadius / 25, scale * 3.5));
