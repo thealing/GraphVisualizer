@@ -13,7 +13,7 @@ function isPlanar(nodes, edges) {
 	const f = new Set();
 	function dfs1(n1, e1) {
 		for (const [n2, e2] of adj[n1]) {
-			if (e2 == e1) {
+			if (u[e2] != null) {
 				continue;
 			}
 			u[e2] = v[n1];
@@ -23,15 +23,18 @@ function isPlanar(nodes, edges) {
 				f.add(e2);
 				dfs1(n2, e2);
 			}
-			else if (w[e2] == null) {
+			else {
 				w[e2] = v[n2];
 			}
 			if (w[e2] < w[e1]) {
 				u[e1] = w[e1];
 				w[e1] = w[e2];
 			}
-			else if (w[e2] < u[e1]) {
-				u[e1] = w[e2];
+			if (w[e2] > w[e1]) {
+				u[e1] = Math.min(u[e1], w[e2]);
+			}
+			else {
+				u[e1] = Math.min(u[e1], u[e2]);
 			}
 		}
 	}
@@ -41,10 +44,17 @@ function isPlanar(nodes, edges) {
 			dfs1(i, -1);
 		}
 	}
+	console.log(v);
+	let ss=""
+	for(let i = 0; i < edges.length;i++)ss+="("+edges[i][0]+", "+edges[i][1]+") : "+w[i]+" | ";
+	console.log(ss);
+	ss="";
+	for(let i = 0; i < edges.length;i++)ss+=edges[i][0]+", "+edges[i][1]+" : "+u[i]+" | ";
+	console.log(ss);
 	for (const i of nodes) {
 		function getOrder(e) {
 			let order = w[e] * 2;
-			if (f.has(e) && w[e] < v[i]) {
+			if (f.has(e) && u[e] < v[i]) {
 				order += 1;
 			}
 			return order;
@@ -52,11 +62,10 @@ function isPlanar(nodes, edges) {
 		adj[i].sort((a, b) => getOrder(a[1]) - getOrder(b[1]));
 	}
 	function getLowestEnd(p) {
-		if (p[0].length == 0) {
-			return w[p[1][0]];
-		}
-		if (p[1].length == 0) {
-			return w[p[0][0]];
+		for (let i = 0; i < 2; i++) {
+			if (p[i].length == 0) {
+				return w[p[1 - i][0]];
+			}
 		}
 		return Math.min(w[p[0][0]], w[p[1][0]]);
 	}
@@ -108,11 +117,8 @@ function isPlanar(nodes, edges) {
 				console.log("NOT PLANAR 2");
 			}
 			s.pop();
-			r[p[1][0]] = q[1][1];
-			if (q[1][0] != null) {
-				p[1][0] = q[1][0];
-			}
 			merge(p[0], q[0]);
+			merge(p[1], q[1]);
 		}
 		// console.log(p);
 		if (p[0].length != 0 || p[1].length != 0) {
@@ -131,20 +137,22 @@ function isPlanar(nodes, edges) {
 			s.pop();
 		}
 		const q = s.top();
-		while (true) {
-			const e = q[0][1];
-			if (e == null) {
-				break;
+		for (let i = 0; i < 2; i++) {
+			while (true) {
+				const e = q[i][1];
+				if (e == null) {
+					const f = q[i][0];
+					if (f != null) {
+						r[f] = q[1 - i][0];
+						q[i].length = 0;
+					}
+					break;
+				}
+				if (w[e] != v[n]) {
+					break;
+				}
+				q[i][1] = r[e];
 			}
-			if (w[e] != v[n]) {
-				return;
-			}
-			q[0][1] = r[e];
-		}
-		const f = q[0][0];
-		if (f != null) {
-			r[f] = q[1][0];
-			q[0][0] = null;
 		}
 	}
 	function dfs2(n1, e1) {
@@ -191,7 +199,4 @@ function isPlanar(nodes, edges) {
 			dfs2(i, -1);
 		}
 	}
-	// console.log(v);
-	// console.log(w);
-	// console.log(u);
 }
