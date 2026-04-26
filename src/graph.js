@@ -59,16 +59,23 @@ function isPlanar(nodes, edges) {
 		adj[i] = adj[i].filter(isDirectedEdge);
 		adj[i].sort((a, b) => getOrder(a[1]) - getOrder(b[1]));
 	}
+	function Interval(l, h) {
+		this.l = l ?? -1;
+		this.h = h ?? -1;
+		this.empty = () => {
+			return this.l == -1 && this.h == -1;
+		};
+	}
 	function getLowestEnd(p) {
 		for (let i = 0; i < 2; i++) {
-			if (p[i].length == 0) {
-				return w[p[1 - i][0]];
+			if (p[i].empty()) {
+				return w[p[1 - i].l];
 			}
 		}
-		return Math.min(w[p[0][0]], w[p[1][0]]);
+		return Math.min(w[p[0].l], w[p[1].l]);
 	}
 	function isConflicting(c, e) {
-		return c.length > 0 && w[c[1]] > w[e];
+		return !c.empty() && w[c.h] > w[e];
 	}
 	const s = [];
 	s.top = function() {
@@ -77,32 +84,34 @@ function isPlanar(nodes, edges) {
 	const l = [];
 	const r = [];
 	function merge(c1, c2) {
-		if (c1.length == 0) {
-			c1[1] = c2[1];
+		if (c1.empty()) {
+			c1.h = c2.h;
 		}
 		else {
-			r[c1[0]] = c2[1];
+			r[c1.l] = c2.h;
 		}
-		c1[0] = c2[0];
+		c1.l = c2.l;
 	}
 	function addConstraints(e1, e2, sb) {
-		let p = [[], []];
+		// console.log("ENTER " + edges[e1]?.join() + " " + edges[e2]?.join() + " " + s.length);
+		const pr = new Interval();
 		do {
 			const q = s.pop();
-			if (q[0].length > 0) {
+			if (!q[0].empty()) {
 				q.reverse();
 			}
-			if (q[0].length > 0) {
+			if (!q[0].empty()) {
 				console.log("NOT PLANAR 1");
 			}
-			if (w[q[1][0]] > w[e1]) {
-				merge(p[1], q[1]);
+			if (w[q[1].l] > w[e1]) {
+				merge(pr, q[1]);
 			}
 			else {
-				r[q[1][0]] = l[e1];
+				r[q[1].l] = l[e1];
 			}
 		}
 		while (s.length > sb);
+		const pl = new Interval();
 		while (s.length > 0) {
 			const q = s.top();
 			if (isConflicting(q[1], e2)) {
@@ -115,57 +124,76 @@ function isPlanar(nodes, edges) {
 				console.log("NOT PLANAR 2");
 			}
 			s.pop();
-			merge(p[0], q[0]);
-			merge(p[1], q[1]);
+			r[pl.l] = q[1].h;
+			if (q[1].l != -1) {
+				pl.l = q[1].l;
+			}
+			merge(pl, q[0]);
 		}
-		// console.log(p);
-		if (p[0].length != 0 || p[1].length != 0) {
+		if (!pl.empty() || !pr.empty()) {
+			const p = [pl, pr];
 			s.push(p);
+			// console.log("ADDED " + edges[p[0].l]?.join() + " " + edges[p[0].h]?.join() + " - " + edges[p[1].l]?.join() + " " + edges[p[1].h]?.join());
 		}
 	}
 	function removeConstraints(n) {
+		// console.log("LEAVE " + n);
 		while (true) {
 			if (s.length == 0) {
 				return;
 			}
 			const q = s.top();
 			if (getLowestEnd(q) != v[n]) {
+				// console.log("! " + getLowestEnd(q));
 				break;
 			}
 			s.pop();
 		}
+		// console.log("SIZE ONE " + s.length);
 		const q = s.top();
 		for (let i = 0; i < 2; i++) {
 			while (true) {
-				const e = q[i][1];
-				if (e == null) {
-					const f = q[i][0];
-					if (f != null) {
-						r[f] = q[1 - i][0];
-						q[i].length = 0;
+				const e = q[i].h;
+				if (e == -1) {
+					const f = q[i].l;
+					if (f != -1) {
+						r[f] = q[1 - i].l;
+						q[i].l = -1;
 					}
 					break;
 				}
 				if (w[e] != v[n]) {
 					break;
 				}
-				q[i][1] = r[e];
+				q[i].h = r[e] ?? -1;
 			}
 		}
+		// console.log("SIZE TWO " + s.length);
 	}
 	function dfs2(n1, e1) {
 		let first = true;
 		for (const [n2, e2] of adj[n1]) {
-			if (e2 == e1) {
-				continue;
-			}
 			const sb = s.length;
 			if (f.has(e2)) {
 				dfs2(n2, e2);
+				removeConstraints(n1);
+				if (w[e2] < v[n1] && s.length > 0) {
+					const q = s.top();
+					const h0 = q[0].h;
+					const h1 = q[1].h;
+					if (h0 != -1 && (h1 == -1 || w[h0] > w[h1])) {
+						r[e2] = h0;
+					}
+					else {
+						r[e2] = h1;
+					}
+				}
 			}
 			else {
 				l[e2] = e2;
-				s.push([[], [e2, e2]]);
+				const c1 = new Interval();
+				const c2 = new Interval(e2, e2);
+				s.push([c1, c2]);
 			}
 			if (w[e2] < v[n1]) {
 				if (first) {
@@ -174,20 +202,6 @@ function isPlanar(nodes, edges) {
 				}
 				else {
 					addConstraints(e1, e2, sb);
-				}
-			}
-		}
-		if (e1 != -1) {
-			removeConstraints(n1);
-			if (w[e1] < v[n1] && s.length > 0) {
-				const q = s.top();
-				const le = q[0][1];
-				const he = q[1][1];
-				if (le != null && (he == null || w[le] > w[he])) {
-					r[e1] = le;
-				}
-				else {
-					r[e1] = he;
 				}
 			}
 		}
