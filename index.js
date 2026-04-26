@@ -181,6 +181,13 @@ function onRefresh() {
 }
 
 function deleteNode(i) {
+	const node = nodes[i];
+	for (const type in node.listeners) {
+		node.svgElement.removeEventListener(type, node.listeners[type]);
+	}
+	for (const type in node.documentListeners) {
+		document.removeEventListener(type, node.documentListeners[type]);
+	}
 	nodes[i].svgElement.remove();
 }
 
@@ -959,51 +966,61 @@ function Node(x, y, i) {
 	this.dragging = false;
 	this.grabOffset = new Vector();
 	this.svgElement = createSvgNode(this.p.x, this.p.y, i);
-	this.svgElement.addEventListener("mousedown", e => {
+	this.listeners = {};
+	this.documentListeners = {};
+	this.listeners["mousedown"] = e => {
 		this.dragging = true;
 		this.grabOffset = this.p.sub(new Vector(e.clientX, e.clientY));
 		document.body.style.cursor = "grabbing\n";
 		e.stopPropagation();
-	});
-	this.svgElement.addEventListener("touchstart", e => {
+	};
+	this.listeners["touchstart"] = e => {
 		if (e.touches.length != 1) return;
 		this.dragging = true;
 		this.grabOffset = this.p.sub(new Vector(e.touches[0].clientX, e.touches[0].clientY));
 		e.stopPropagation();
-	}, { passive: false });
-	document.addEventListener("mouseup", e => {
+	};
+	this.documentListeners["mouseup"] = e => {
 		if (this.dragging) {
 			this.dragging = false;
 			document.body.style.cursor = "grab\n";
 		}
-	});
-	document.addEventListener("touchend", e => {
+	};
+	this.documentListeners["touchend"] = e => {
 		if (this.dragging) {
 			this.dragging = false;
 		}
-	});
- 	document.addEventListener("mousemove", e => {
+	};
+	this.documentListeners["mousemove"] = e => {
 		if (this.dragging) {
 			document.body.style.cursor = "grabbing\n";
 			this.p = new Vector(e.clientX, e.clientY).add(this.grabOffset);
 		}
-	});
-	document.addEventListener("touchmove", e => {
+	};
+	this.documentListeners["touchmove"] = e => {
 		if (this.dragging && e.touches.length == 1) {
 			this.p = new Vector(e.touches[0].clientX, e.touches[0].clientY).add(this.grabOffset);
 			e.preventDefault();
 		}
-	}, { passive: false });
-	this.svgElement.addEventListener("mouseenter", e => {
+	};
+	this.listeners["mouseenter"] = e => {
 		if (!this.dragging) {
 			document.body.style.cursor = "grab\n";
 		}
-	});
-	this.svgElement.addEventListener("mouseleave", e => {
+	};
+	this.listeners["mouseleave"] = e => {
 		if (!this.dragging) {
 			document.body.style.cursor = "default\n";
 		}
-	});
+	};
+	for (const type in this.listeners) {
+		const options = type == "touchstart" ? { passive: false } : undefined;
+		this.svgElement.addEventListener(type, this.listeners[type], options);
+	}
+	for (const type in this.documentListeners) {
+		const options = type == "touchmove" ? { passive: false } : undefined;
+		document.addEventListener(type, this.documentListeners[type], options);
+	}
 }
 
 function Edge(a, b, weight, headless) {
