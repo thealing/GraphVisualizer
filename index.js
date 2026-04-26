@@ -51,15 +51,14 @@ function onUpdate() {
 		addEdge(a, b, w);
 	}
 	for (const i in nodes) {
-		if (nodes[i].gen === 0) {
-			nodes[i].svgElement.remove();
+		if (nodes[i].gen == 0) {
+			deleteNode(i);
 			delete nodes[i];
 		}
 	}
 	for (const [k, v] of edges.entries()) {
 	 	if (v.gen == 0) {
-	 		v.svgElement.group.remove();
-			v.arrow.remove();
+			deleteEdge(v);
 			edges.delete(k);
 		}
 	}
@@ -171,15 +170,23 @@ function onUpdate() {
 
 function onRefresh() {
 	for (const i in nodes) {
-		nodes[i].svgElement.remove();
+		deleteNode(i);
 	}
 	for (const e of edges.values()) {
-	 	e.svgElement.group.remove();
-		e.arrow.remove();
+	 	deleteEdge(e);
 	}
 	nodes = new Map();
 	edges = new Map();
 	onUpdate()
+}
+
+function deleteNode(i) {
+	nodes[i].svgElement.remove();
+}
+
+function deleteEdge(e) {
+	e.svgElement.group.remove();
+	e.arrow.remove();
 }
 
 function replaceEdges(lines) {
@@ -299,7 +306,7 @@ function init() {
 	const numericInputs = document.querySelectorAll('#toolbar input[type="number"]');
 	numericInputs.forEach(input => {
 		input.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') {
+			if (e.key == 'Enter') {
 				onApply();
 			}
 		});
@@ -395,7 +402,7 @@ function updateInput() {
 
 function getBounds(element) {
 	const style = window.getComputedStyle(element);
-	const fontSize = element.attributes["font-size"] ?? "1";
+	const fontSize = element.attributeCache["font-size"] ?? "1";
 	const newFont = `${fontSize}px ${displayFont}`;
 	if (canvasFontProperty != newFont) {
 		canvasFontProperty = newFont;
@@ -881,9 +888,9 @@ function clampValue(numericInput) {
 }
 
 function setAttributeCache(e, attribute, value) {
-	e.attributes ??= {};
-	if (e.attributes[attribute] != value) {
-		e.attributes[attribute] = value;
+	e.attributeCache ??= {};
+	if (e.attributeCache[attribute] != value) {
+		e.attributeCache[attribute] = value;
 		e.setAttribute(attribute, value);
 	}
 }
