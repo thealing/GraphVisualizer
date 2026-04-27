@@ -77,30 +77,15 @@ function onUpdate() {
 		adj[e.b] ??= [];
 		adj[e.b].push(e.a);
 	}
-	for (const e of undirectedEdges) {
-		const queue = [e.a, e.b];
-		const distances = [];
-		distances[e.a] = 0;
-		distances[e.b] = 0;
-		let i = 0;
-		while (i < queue.length) {
-			const a = queue[i++];
-			const d = distances[a];
-			for (const b of adj[a]) {
-				if (distances[b] == null) {
-					distances[b] = d + 1;
-					queue.push(b);
-				}
-			}
-		}
-		e.distances = distances;
-		e.nodeSides = {};
-	}
 	const nodeCollection = Object.keys(nodes);
 	const planarEdges = undirectedEdges.map(e => [e.a, e.b]);
-	const planar = isPlanar(nodeCollection, planarEdges);
+	planar = isPlanar(nodeCollection, planarEdges);
 	if (planar) {
 		console.log(planar);
+	}
+	const edgeNodeSides = findNodeSides(nodeCollection, planarEdges);
+	for (let i = 0; i < undirectedEdges.length; i++) {
+		undirectedEdges[i].nodeSides = edgeNodeSides[i];
 	}
 }
 
@@ -551,28 +536,62 @@ function update() {
 			if (l > 1e-3) {
 				const n = d.div(l);
 				const error = n.mul(springDistance - l);
-				const tv = error.mul(0.4);
+				const tv = error.mul(0.03);
 				const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
 				const impulse = tv.sub(rv).mul(0.5);
 				applyImpulse(a, impulse.neg());
 				applyImpulse(b, impulse);
 			}
 		}
-		function getDirection(e, f) {
-			const ra = e.distances[f.a];
-			const rb = e.distances[f.b];
-			const n = nodes[e.b].p.sub(nodes[e.a].p).norm().left();
-			if (ra == null && rb == null) {
-				return n;
-			}
+		function getNormal(e) {
+			return nodes[e.b].p.sub(nodes[e.a].p).norm().right();
+		}
+		function getTreeEdgeDirection(e, f) {
+			const ra = planar.heights[f.a];
+			const rb = planar.heights[f.b];
+			const n = getNormal(e);
 			let d = 0;
 			if (ra > rb) {
+				console.log("TE - " + "["+e.a+", "+e.b+"]" + " X " + "["+f.a+", "+f.b+"]" + " : " + f.a);
 				d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
 			}
 			if (rb > ra) {
+				console.log("TE - " + "["+e.a+", "+e.b+"]" + " X " + "["+f.a+", "+f.b+"]" + " : " + f.b);
 				d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
 			}
 			return n.mul(Math.sign(d));
+		}
+		function getBackEdgeDirection(i, e, f) {
+			let hl = planar.heights[e.a];
+			let hh = planar.heights[e.b];
+			let w = planar.windings[i];
+			if (hl > hh) {
+				[hl, hh] = [hh, hl];
+				w *= -1;
+			}
+			const n = getNormal(e).mul(w);
+			let r = 0;
+			const da = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
+			if ((da < 0) == (f.a > hh && f.a < hl)) {
+				console.log("BE - " + "["+e.a+", "+e.b+"]" + " X " + "["+f.a+", "+f.b+"]" + " : " + f.a);
+				r++;
+			}
+			const db = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
+			if ((db < 0) == (f.b > hh && f.b < hl)) {
+				console.log("BE - " + "["+e.a+", "+e.b+"]" + " X " + "["+f.a+", "+f.b+"]" + " : " + f.b);
+				r++;
+			}
+			return n.mul(-r);
+		}
+		function getDirection2(i, j) {
+			const e = edgeArray[i];
+			const f = edgeArray[j];
+			if (planar.treeEdges.has(i) && planar.treeEdges.has(j)) {
+				return getTreeEdgeDirection(e, f);
+			}
+			else {
+				return getBackEdgeDirection(i, e, f);
+			}
 		}
 		const edgePoints = new Float64Array(edgeArray.length * 4);
 		const edgeNodes = new Float64Array(edgeArray.length * 2);
@@ -689,7 +708,7 @@ function update() {
 				}
 				const e1 = edgeArray[i];
 				const e2 = edgeArray[j];
-				edgeContacts.push([e1, e2, dx, dy, lsq, s, t]);
+				edgeContacts.push([i, j, dx, dy, lsq, s, t]);
 				if (lsq < 1e-6) {
 					nodes[e1.a].neighbors.add(e2);
 					nodes[e1.b].neighbors.add(e2);
@@ -698,7 +717,26 @@ function update() {
 				}
 			}
 		}
-		for (const [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
+		function getDirection(e, n) {
+			if (!e.nodeSides) {
+				return null;
+			}
+			const r = e.nodeSides[n];
+			if (!r) {
+				return null;
+			}
+			const v = getNormal(e);
+			const d = v.dot(nodes[n].p.sub(nodes[e.a].p));
+			const s = Math.sign(d);
+			if (s != -r) {
+				return null;
+			}
+			// console.log("G - " + "["+e.a+", "+e.b+"]" + " : " + n);
+			return v.mul(s);
+		}
+		for (const [i, j, dx, dy, lsq, s, t] of edgeContacts) {
+			const e1 = edgeArray[i];
+			const e2 = edgeArray[j];
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
 			let error;
@@ -706,9 +744,31 @@ function update() {
 				if (e1.a == e1.b || e2.a == e2.b) {
 					continue;
 				}
-				const d1 = getDirection(e1, e2);
-				const d2 = getDirection(e2, e1);
-				error = d2.sub(d1);
+				function maximize(d) {
+					error = error.add(d);
+				}
+				if (l < 1e-3) {
+					error = new Vector();
+					const d1a = getDirection(e2, e1.a);
+					const d1b = getDirection(e2, e1.b);
+					const d2a = getDirection(e1, e2.a);
+					const d2b = getDirection(e1, e2.b);
+					if (d1a) {
+						maximize(d1a);
+					}
+					if (d1b) {
+						maximize(d1b);
+					}
+					if (d2a) {
+						maximize(d2a.neg());
+					}
+					if (d2b) {
+						maximize(d2b.neg());
+					}
+				}
+				// const d1 = getDirection(i, j);
+				// const d2 = getDirection(j, i);
+				// error = d2.sub(d1);
 			}
 			else {
 				if (nodes[e1.a].neighbors.has(e2)) {

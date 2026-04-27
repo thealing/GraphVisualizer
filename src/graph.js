@@ -1,3 +1,80 @@
+
+function findNodeSides(nodes, edges) {
+	const adj = [];
+	for (let i = 0; i < edges.length; i++) {
+		const [a, b] = edges[i];
+		adj[a] ??= [];
+		adj[a].push([b, i]);
+		adj[b] ??= [];
+		adj[b].push([a, i]);
+	}
+	const v = [];
+	function setHeights(n) {
+		for (const [m, _] of adj[n]) {
+			if (v[m] == null) {
+				v[m] = v[n] + 1;
+				setHeights(m);
+			}
+		}
+	}
+	for (const i of nodes) {
+		if (v[i] == null) {
+			v[i] = 0;
+			setHeights(i);
+		}
+	}
+	const nodeSides = new Array(edges.length);
+	const setSideNodes = new Set();
+	function setSides(n, e, s) {
+		nodeSides[e][n] = s; 
+		for (const [m] of adj[n]) {
+			if (v[m] == v[n] + 1) {
+				setSides(m, e, s);
+			}
+		}
+	}
+	const stack = [];
+	function setEdgeSides(n, e) {
+		nodeSides[e] = [];
+		setSides(n, e, 1);
+		for (const [m, k] of stack) {
+			nodeSides[e][m] = -1;
+			let d = -1;
+			const a = adj[m];
+			for (let i = 0; i < a.length; i++) {
+				if (i == k) {
+					d = 1;
+					continue;
+				}
+				const [q] = a[i];
+				if (v[q] == v[m] + 1) {
+					setSides(q, e, d);
+				}
+			}
+		}
+	}
+	function findSides(n) {
+		const a = adj[n];
+		const p = [n, -1];
+		stack.push(p);
+		for (let i = 0; i < a.length; i++) {
+			p[1] = i;
+			const [m, e] = a[i];
+			if (v[m] == v[n] + 1) {
+				setEdgeSides(m, e);
+				findSides(m);
+			}
+		}
+		stack.pop();
+	}
+	for (const i in nodes) {
+		if (v[i] == 0) {
+			findSides(i);
+		}
+	}
+	return nodeSides;
+}
+
 function isPlanar(nodes, edges) {
 	const adj = [];
 	const sides = new Array(edges.length);
@@ -236,21 +313,5 @@ function isPlanar(nodes, edges) {
 	for (let i = 0; i < edges.length; i++) {
 		setWinding(i);
 	}
-	const separator = nodes.length * nodes.length;
-	for (const i of nodes) {
-		function getOrder(e) {
-			let order = w[e] * 2;
-			if (f.has(e)) {
-				if (u[e] < v[i]) {
-					order += 1;
-				}
-			}
-			else {
-				order = (order + separator) * windings[e];
-			}
-			return order;
-		}
-		adj[i].sort((a, b) => getOrder(a[1]) - getOrder(b[1]));
-	}
-	return { adj, windings };
+	return { adj, windings, heights: v, treeEdges: f };
 }
