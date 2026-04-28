@@ -237,5 +237,46 @@ function isPlanar(nodes, edges) {
 	for (let i = 0; i < edges.length; i++) {
 		setWinding(i);
 	}
-	return { adj, windings, heights: v, treeEdges: f };
+	for (const i of nodes) {
+		function getOrder(e) {
+			let order = w[e] * 2;
+			if (f.has(e) && u[e] < v[i]) {
+				order += 1;
+			}
+			return order * windings[e];
+		}
+		adj[i].sort((a, b) => getOrder(a[1]) - getOrder(b[1]));
+	}
+	const adjacencyLists = [];
+	const leftId = [];
+	const rightId = [];
+	function dfs3(n1, e1) {
+		for (const [n2, e2] of adj[n1]) {
+			if (f.has(e2)) {
+				adjacencyLists[n2] = [n1];
+				leftId[n2] = n1;
+				rightId[n2] = n1;
+				dfs3(n2, e2);
+				adjacencyLists[n1].push(n2);
+			}
+			else {
+				if (windings[e2] == 1) {
+					const i = adjacencyLists[n2].indexOf(rightId[n2]);
+					adjacencyLists[n2].splice(i + 1, 0, n1);
+				}
+				else {
+					const i = adjacencyLists[n2].indexOf(leftId[n2]);
+					adjacencyLists[n2].splice(i, 0, n1);
+					leftId[n2] = n1;
+				}
+			}
+		}
+	}
+	for (const i of nodes) {
+		if (v[i] == 0) {
+			adjacencyLists[i] ??= [];
+			dfs3(i, -1);
+		}
+	}
+	return { adjacencyLists, heightMap: v, treeEdgeSet: f };
 }

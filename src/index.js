@@ -103,6 +103,8 @@ function onUpdate() {
 		console.log(planar);
 		
 		if(true)
+			adj=planar.adjacencyLists;
+		else
 		{
 				function getClosestPoints(p1, p2, p3, p4) {
 			const u = p2.sub(p1);
@@ -138,7 +140,7 @@ function onUpdate() {
 			}
 			return { s, t, p1: p1.add(u.mul(s)), p2: p3.add(v.mul(t)) };
 		}
-			for(let AT=0;AT<1000000;AT++) {
+			for(let AT=0;AT<10000000;AT++) {
 				const pos = {};
 				for (const i in nodes) {
 					pos[i] = getRandomPosition();
@@ -823,72 +825,54 @@ function update() {
 			applyImpulse(e2.b, impulse.mul(t));
 		}
 		for (const u in nodes) {
-    const nb = adj[u];
-    const n = nb.length;
-    if (n < 3) {
-        continue;
-    }
-    
-    // a will hold the nb-indices sorted by their current physical angle
-    const a = new Array(n);
-    for (let i = 0; i < n; i++) {
-        a[i] = i;
-    }
-    a.sort((i, j) => {
-        const p0 = nodes[u].p;
-        const p1 = nodes[nb[i]].p;
-        const p2 = nodes[nb[j]].p;
-        const angle1 = Math.atan2(p1.y - p0.y, p1.x - p0.x);
-        const angle2 = Math.atan2(p2.y - p0.y, p2.x - p0.x);
-        return angle1 - angle2;
-    });
-    
-    // Check the indices in a circle
-    for (let i = 0; i < n; i++) {
-        let j = (i + 1) % n; // Wrap around to 0 at the end
-        
-        const currIndex = a[i];
-        const nextIndex = a[j];
-        
-        // Since `nb` is perfectly ordered, the index that SHOULD be next 
-        // in a CCW direction is simply currIndex + 1 (wrapping around at n)
-        const expectedNext = (currIndex + 1) % n;
-        
-        // Use the indices to check if they are in the correct order!
-        if (nextIndex !== expectedNext) {
-            // THEY ARE CROSSED! 
-            // The node physically next to it is NOT the topological neighbor.
-            const v1 = nb[currIndex];
-            const v2 = nb[nextIndex];
-            
-            const dx1 = nodes[v1].p.x - nodes[u].p.x;
-            const dy1 = nodes[v1].p.y - nodes[u].p.y;
-            const dx2 = nodes[v2].p.x - nodes[u].p.x;
-            const dy2 = nodes[v2].p.y - nodes[u].p.y;
-            
-            // Your impulse math to push them apart
-            const d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) + 1e-6;
-            const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) + 1e-6;
-            const tx1 = -dy1 / d1, ty1 = dx1 / d1;
-            const tx2 = -dy2 / d2, ty2 = dx2 / d2;
-            
-            const rv1 = ((nodes[v1].v.x - nodes[u].v.x) * tx1 + (nodes[v1].v.y - nodes[u].v.y) * ty1) / d1;
-            const rv2 = ((nodes[v2].v.x - nodes[u].v.x) * tx2 + (nodes[v2].v.y - nodes[u].v.y) * ty2) / d2;
-            const rv = rv2 - rv1;
-            
-            // Apply a constant push force when they are out of order
-            const da = (15.9 / n) - rv; 
-            const l = da * 0.5;
-            
-            const imp1 = new Vector(tx1 * -l * d1, ty1 * -l * d1);
-            const imp2 = new Vector(tx2 * l * d2, ty2 * l * d2);
-            
-            applyImpulse(v1, imp1);
-            applyImpulse(v2, imp2);
-            applyImpulse(u, imp1.add(imp2).neg());
-        }
-    }
-}
+			// break; //!!!!
+			const nb = adj[u];
+			const n = nb.length;
+			if (n < 3) {
+				continue;
+			}
+			const a = new Array(n);
+			for (let i = 0; i < n; i++) {
+				a[i] = i;
+			}
+			a.sort((i, j) => {
+				const p0 = nodes[u].p;
+				const p1 = nodes[nb[i]].p;
+				const p2 = nodes[nb[j]].p;
+				const angle1 = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+				const angle2 = Math.atan2(p2.y - p0.y, p2.x - p0.x);
+				return angle1 - angle2;
+			});
+			for (let i = 0; i < n; i++) {
+				let j = (i + 1) % n;
+				const currentIndex = a[i];
+				const nextIndex = a[j];
+				const expectedNext = (currentIndex + j - i + n) % n;
+				if (nextIndex != expectedNext) {
+					const force = 5 * -Math.sign(currentIndex - nextIndex);
+					const v1 = nb[currentIndex];
+					const v2 = nb[nextIndex];
+					const dx1 = nodes[v1].p.x - nodes[u].p.x;
+					const dy1 = nodes[v1].p.y - nodes[u].p.y;
+					const dx2 = nodes[v2].p.x - nodes[u].p.x;
+					const dy2 = nodes[v2].p.y - nodes[u].p.y;
+					const d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) + 1e-6;
+					const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) + 1e-6;
+					const tx1 = -dy1 / d1, ty1 = dx1 / d1;
+					const tx2 = -dy2 / d2, ty2 = dx2 / d2;
+					const rv1 = ((nodes[v1].v.x - nodes[u].v.x) * tx1 + (nodes[v1].v.y - nodes[u].v.y) * ty1) / d1;
+					const rv2 = ((nodes[v2].v.x - nodes[u].v.x) * tx2 + (nodes[v2].v.y - nodes[u].v.y) * ty2) / d2;
+					const rv = rv2 - rv1;
+					const da = (force / n) - rv; 
+					const l = da * 0.5;
+					const imp1 = new Vector(tx1 * -l * d1, ty1 * -l * d1);
+					const imp2 = new Vector(tx2 * l * d2, ty2 * l * d2);
+					applyImpulse(v1, imp1);
+					applyImpulse(v2, imp2);
+					applyImpulse(u, imp1.add(imp2).neg());
+				}
+			}
+		}
 		finalizeImpulses();
 		for (const i in nodes) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
