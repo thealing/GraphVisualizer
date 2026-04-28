@@ -1,5 +1,5 @@
 
-function isPlanar(nodes, edges) {
+function getPlanarOrdering(nodes, edges) {
 	const adj = [];
 	const signs = new Array(edges.length);
 	for (let i = 0; i < edges.length; i++) {
@@ -286,5 +286,5 @@ function isPlanar(nodes, edges) {
 			dfs3(i, -1);
 		}
 	}
-	return { adjacencyLists, edgeSides, heights: v, treeEdges: f };
+	return adjacencyLists;
 }
