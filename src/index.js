@@ -96,14 +96,162 @@ function onUpdate() {
 		e.distances = distances;
 		e.nodeSides = {};
 	}
-	const nodeCollection = Object.keys(nodes);
+	const nodeCollection = Object.keys(nodes).map(Number);
 	const planarEdges = undirectedEdges.map(e => [e.a, e.b]);
 	planar = isPlanar(nodeCollection, planarEdges);
 	if (planar) {
 		console.log(planar);
 		
+		function printPlanar(adj) {
+    const nodes = Object.keys(adj).map(Number);
+
+    // --- 1. Basic validation ---
+    const edgeSet = new Set(); // undirected edges
+    const directedEdges = new Set();
+
+    for (const u of nodes) {
+        const list = adj[u];
+
+        // check duplicates
+        const seen = new Set();
+        for (const v of list) {
+            if (seen.has(v)) {
+                console.log("NO: duplicate neighbor at node", u);
+                return;
+            }
+            seen.add(v);
+
+            directedEdges.add(u + "->" + v);
+
+            // build undirected edge key
+            const key = u < v ? u + "|" + v : v + "|" + u;
+            edgeSet.add(key);
+        }
+    }
+
+    // check symmetry
+    for (const u of nodes) {
+        for (const v of adj[u]) {
+            if (!adj[v] || !adj[v].includes(u)) {
+                console.log("NO: edge not symmetric between", u, "and", v);
+                return;
+            }
+        }
+    }
+
+    const V = nodes.length;
+    const E = edgeSet.size;
+
+    // --- 2. Count connected components ---
+    let visited = new Set();
+    let C = 0;
+
+    function dfs(u) {
+        visited.add(u);
+        for (const v of adj[u]) {
+            if (!visited.has(v)) dfs(v);
+        }
+    }
+
+    for (const u of nodes) {
+        if (!visited.has(u)) {
+            C++;
+            dfs(u);
+        }
+    }
+
+    // --- 3. Face traversal ---
+    const used = new Set(); // directed edges used in face walks
+    let F = 0;
+
+    for (const u of nodes) {
+        for (const v of adj[u]) {
+            const startKey = u + "->" + v;
+            if (used.has(startKey)) continue;
+
+						// console.log("start:", startKey);
+						
+            let a = u;
+            let b = v;
+
+            const seenInThisFace = new Set();
+            let steps = 0;
+            const MAX_STEPS = directedEdges.size + 5; // hard guard
+
+            while (true) {
+                const key = a + "->" + b;
+
+                if (used.has(key)) {
+                    console.log("NO: edge reused before closing a face at", key);
+                    return;
+                }
+
+								// console.log("go:", key);
+
+                used.add(key);
+                seenInThisFace.add(key);
+
+                const list = adj[b];
+                const idx = list.indexOf(a);
+
+                if (idx === -1) {
+                    console.log("NO: rotation broken at node", b, "(missing neighbor", a, ")");
+                    return;
+                }
+
+                // move to next edge in cyclic order
+                const next = list[(idx + 1) % list.length];
+
+                a = b;
+                b = next;
+
+                steps++;
+                if (steps > MAX_STEPS) {
+                    console.log("NO: infinite loop detected during face traversal");
+                    return;
+                }
+
+                if (a === u && b === v) break;
+								
+            }
+
+            F++;
+        }
+    }
+
+    // --- 4. Check all directed edges used ---
+    if (used.size !== directedEdges.size) {
+        console.log("NO: not all directed edges were covered in face traversal");
+        return;
+    }
+		
+		F -= C - 1;//AI SLOP FIX
+
+    // --- 5. Euler formula check ---
+    const lhs = V - E + F;
+    const rhs = 1 + C;
+
+    if (lhs !== rhs) {
+        console.log(
+            "NO: Euler formula failed:",
+            "V - E + F =", lhs,
+            "but expected", rhs,
+            "(V=" + V + ", E=" + E + ", F=" + F + ", C=" + C + ")"
+        );
+        return;
+    }
+
+    console.log(
+        "YES: valid planar embedding",
+        "(V=" + V + ", E=" + E + ", F=" + F + ", C=" + C + ")"
+    );
+}
 		if(true)
+		{
 			adj=planar.adjacencyLists;
+			
+			printPlanar(adj);
+		}
 		else
 		{
 				function getClosestPoints(p1, p2, p3, p4) {
@@ -676,13 +824,11 @@ function update() {
 					const D = a * c - b * b;
 					const E = 1e-6;
 					if (D < E) {
-						const aZero = a < E;
-						const bZero = c < E;
-						if (aZero && bZero) {
+						if (a < E && c < E) {
 							s = 0;
 							t = 0;
 						}
-						else if (aZero) {
+						else if (a < E) {
 							s = 0;
 							t = ((x1 - x3) * vx + (y1 - y3) * vy) / c;
 							if (t < 0) {
@@ -692,7 +838,7 @@ function update() {
 								t = 1;
 							}
 						}
-						else if (bZero) {
+						else if (c < E) {
 							s = ((x3 - x1) * ux + (y3 - y1) * uy) / a;
 							t = 0;
 							if (s < 0) {

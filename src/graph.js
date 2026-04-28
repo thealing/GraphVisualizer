@@ -1,14 +1,14 @@
 
 function isPlanar(nodes, edges) {
 	const adj = [];
-	const sides = new Array(edges.length);
+	const signs = new Array(edges.length);
 	for (let i = 0; i < edges.length; i++) {
 		const [a, b] = edges[i];
 		adj[a] ??= [];
 		adj[a].push([b, i]);
 		adj[b] ??= [];
 		adj[b].push([a, i]);
-		sides[i] = 1;
+		signs[i] = 1;
 	}
 	const v = [];
 	const w = [];
@@ -69,7 +69,7 @@ function isPlanar(nodes, edges) {
 			return this.l == -1 && this.h == -1;
 		};
 	}
-	function getLowestEnd(p) {
+	function getLowestHeight(p) {
 		for (let i = 0; i < 2; i++) {
 			if (p[i].empty()) {
 				return w[p[1 - i].l];
@@ -86,7 +86,7 @@ function isPlanar(nodes, edges) {
 	}
 	const l = [];
 	const r = [];
-	function merge(c1, c2) {
+	function mergeIntervals(c1, c2) {
 		if (c1.empty()) {
 			c1.h = c2.h;
 		}
@@ -97,7 +97,8 @@ function isPlanar(nodes, edges) {
 	}
 	let result = true;
 	function addConstraints(e1, e2, sb) {
-		const pr = new Interval();
+		const p1 = new Interval();
+		const p2 = new Interval();
 		do {
 			const q = s.pop();
 			if (!q[0].empty()) {
@@ -108,14 +109,13 @@ function isPlanar(nodes, edges) {
 				return;
 			}
 			if (w[q[1].l] > w[e1]) {
-				merge(pr, q[1]);
+				mergeIntervals(p2, q[1]);
 			}
 			else {
 				r[q[1].l] = l[e1];
 			}
 		}
 		while (s.length > sb);
-		const pl = new Interval();
 		while (s.length > 0) {
 			const q = s.top();
 			if (isConflicting(q[1], e2)) {
@@ -129,14 +129,14 @@ function isPlanar(nodes, edges) {
 				return;
 			}
 			s.pop();
-			r[pr.l] = q[1].h;
+			r[p2.l] = q[1].h;
 			if (q[1].l != -1) {
-				pr.l = q[1].l;
+				p2.l = q[1].l;
 			}
-			merge(pl, q[0]);
+			mergeIntervals(p1, q[0]);
 		}
-		if (!pl.empty() || !pr.empty()) {
-			const p = [pl, pr];
+		if (!p1.empty() || !p2.empty()) {
+			const p = [p1, p2];
 			s.push(p);
 		}
 	}
@@ -146,13 +146,14 @@ function isPlanar(nodes, edges) {
 				return;
 			}
 			const q = s.top();
-			if (getLowestEnd(q) != v[n]) {
+			const h = getLowestHeight(q);
+			if (h != v[n]) {
 				break;
 			}
 			s.pop();
 			const e = q[0].l;
 			if (e != -1) {
-				sides[e] = -1;
+				signs[e] = -1;
 			}
 		}
 		const q = s.top();
@@ -162,7 +163,7 @@ function isPlanar(nodes, edges) {
 				if (e == -1) {
 					const f = q[i].l;
 					if (f != -1) {
-						sides[f] = -1;
+						signs[f] = -1;
 						r[f] = q[1 - i].l;
 						q[i].l = -1;
 					}
@@ -222,20 +223,20 @@ function isPlanar(nodes, edges) {
 			}
 		}
 	}
-	const windings = [];
-	function setWinding(e) {
-		if (windings[e] != null) {
+	const edgeSides = [];
+	function setEdgeSide(e) {
+		if (edgeSides[e] != null) {
 			return;
 		}
-		windings[e] = sides[e];
+		edgeSides[e] = signs[e];
 		if (r[e] >= 0) {
 			const p = r[e];
-			setWinding(p);
-			windings[e] *= windings[p];
+			setEdgeSide(p);
+			edgeSides[e] *= edgeSides[p];
 		}
 	}
 	for (let i = 0; i < edges.length; i++) {
-		setWinding(i);
+		setEdgeSide(i);
 	}
 	for (const i of nodes) {
 		function getOrder(e) {
@@ -243,40 +244,47 @@ function isPlanar(nodes, edges) {
 			if (f.has(e) && u[e] < v[i]) {
 				order += 1;
 			}
-			return order * windings[e];
+			order *= edgeSides[e];
+			return order;
 		}
 		adj[i].sort((a, b) => getOrder(a[1]) - getOrder(b[1]));
 	}
 	const adjacencyLists = [];
-	const leftId = [];
-	const rightId = [];
+	const backLists = [];
 	function dfs3(n1, e1) {
+		const backList = [];
+		backList[-1] = [];
+		backList[1] = [];
+		backLists[n1] = backList;
 		for (const [n2, e2] of adj[n1]) {
+			// console.log(n1 + " -> " + n2 + " : " + edgeSides[e2]);
 			if (f.has(e2)) {
 				adjacencyLists[n2] = [n1];
-				leftId[n2] = n1;
-				rightId[n2] = n1;
 				dfs3(n2, e2);
-				adjacencyLists[n1].push(n2);
+				for (let i = -1; i <= 1; i++) {
+					if (i == 0) {
+						adjacencyLists[n1].push(n2);
+						continue;
+					}
+					backList[i].reverse();
+					for (const n of backList[i]) {
+						adjacencyLists[n1].push(n);
+					}
+					backList[i].length = 0;
+				}
 			}
 			else {
-				if (windings[e2] == 1) {
-					const i = adjacencyLists[n2].indexOf(rightId[n2]);
-					adjacencyLists[n2].splice(i + 1, 0, n1);
-				}
-				else {
-					const i = adjacencyLists[n2].indexOf(leftId[n2]);
-					adjacencyLists[n2].splice(i, 0, n1);
-					leftId[n2] = n1;
-				}
+				const s = edgeSides[e2];
+				backLists[n2][s].push(n1);
+				adjacencyLists[n1].push(n2);
 			}
 		}
 	}
 	for (const i of nodes) {
 		if (v[i] == 0) {
-			adjacencyLists[i] ??= [];
+			adjacencyLists[i] = [];
 			dfs3(i, -1);
 		}
 	}
-	return { adjacencyLists, heightMap: v, treeEdgeSet: f };
+	return { adjacencyLists, edgeSides, heights: v, treeEdges: f };
 }
