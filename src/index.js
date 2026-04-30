@@ -589,8 +589,8 @@ function update() {
 				const tv = error.mul(springDistance > l ? 0.2 : 0.06);
 				const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
 				const impulse = tv.sub(rv).mul(0.5);
-				applyImpulse(a, impulse.neg());
-				applyImpulse(b, impulse);
+				// applyImpulse(a, impulse.neg());
+				// applyImpulse(b, impulse);
 			}
 		}
 		const edgePoints = new Float64Array(edgeArray.length * 4);
@@ -713,6 +713,8 @@ function update() {
 					nodes[e2.a].neighbors.add(e1);
 					nodes[e2.b].neighbors.add(e1);
 				}
+				// !!!
+				else if(e1.a!=e1.b&&e2.a!=e2.b)edgeContacts.pop();
 			}
 		}
 		function getNormal(e) {
@@ -744,20 +746,33 @@ function update() {
 				}
 				error = new Vector();
 				for (let t = 0; t < 2; t++) {
-					const p11 = groupIdMap[e1.a].get(e1.b);
-					const p12 = groupIdMap[e1.b].get(e1.a);
-					const p21 = groupIdMap[e2.a].get(e2.b);
-					const p22 = groupIdMap[e2.b].get(e2.a);
-					if (p11[0] == p21[0] || p11[0] == p22[0]) {
-						error = error.add(getNormal(e1));
-					}
-					if (p12[0] == p21[0] || p12[0] == p22[0]) {
-						error = error.add(getNormal(e1).neg());
+					let p11 = groupIdMap[e1.a].get(e1.b);
+					let p12 = groupIdMap[e1.b].get(e1.a);
+					let p21 = groupIdMap[e2.a].get(e2.b);
+					let p22 = groupIdMap[e2.b].get(e2.a);
+					let local = new Vector();
+					for (let ty = 0; ty < 2; ty++) {
+						for (let tt = 0; tt < 2; tt++) {
+							if (p11[0] != 1 && p11[0] == p21[0]) {
+								let n = getNormal(e1);
+								if (p11[1] > p21[1]) {
+									// n = n.neg();
+								}
+								local = local.add(n);
+							}
+							[p21, p22] = [p22, p21];
+						}
+						[p11, p12] = [p12, p11];
+						local = local.neg();
 					}
 					[e1, e2] = [e2, e1];
+					error = error.add(local);
 					error = error.neg();
 				}
 				error = error.neg();
+				// !!!
+				// const d1 = getDirection(e1, e2);
+				// const d2 = getDirection(e2, e1);
 				// error = d2.sub(d1);
 			}
 			else {
