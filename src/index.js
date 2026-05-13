@@ -62,8 +62,8 @@ function onUpdate() {
 			edges.delete(k);
 		}
 	}
-	adj = {};
 	undirectedEdges = [];
+	unorderedNeighbors = {};
 	const edgeMap = new Set();
 	for (const e of edges.values()) {
 		const key = Math.min(e.a, e.b) + '-' + Math.max(e.a, e.b);
@@ -72,71 +72,39 @@ function onUpdate() {
 		}
 		edgeMap.add(key);
 		undirectedEdges.push(e);
-		adj[e.a] ??= [];
-		adj[e.a].push(e.b);
-		adj[e.b] ??= [];
-		adj[e.b].push(e.a);
-	}
-	for (const e of undirectedEdges) {
-		const queue = [e.a, e.b];
-		const distances = [];
-		distances[e.a] = 0;
-		distances[e.b] = 0;
-		let i = 0;
-		while (i < queue.length) {
-			const a = queue[i++];
-			const d = distances[a];
-			for (const b of adj[a]) {
-				if (distances[b] == null) {
-					distances[b] = d + 1;
-					queue.push(b);
-				}
-			}
-		}
-		e.distances = distances;
-		e.nodeSides = {};
+		unorderedNeighbors[e.a] ??= [];
+		unorderedNeighbors[e.a].push(e.b);
+		unorderedNeighbors[e.b] ??= [];
+		unorderedNeighbors[e.b].push(e.a);
 	}
 	const nodeCollection = Object.keys(nodes).map(Number);
 	const planarEdges = undirectedEdges.map(e => [e.a, e.b]);
 	planarOrdering = getPlanarOrdering(nodeCollection, planarEdges);
-	groupIdMap = [];
-	groupSizeMap = [];
+	dfsTreeHeights = [];
+	dfsEnterTimes = [];
+	dfsLeaveTimes = [];
 	if (planarOrdering) {
 		console.log(planarOrdering);
-		adj = planarOrdering;
-		for (const n of nodeCollection) {
-			groupIdMap[n] = new Map();
-		}
-		const nextNodeMap = [];
-		for (const n of nodeCollection) {
-			nextNodeMap[n] = new Map();
-			const a = adj[n];
-			for (let i = a.length - 1, j = 0; j < a.length; i = j, j++) {
-				nextNodeMap[n].set(a[i], a[j]);
-			}
-		}
-		let id = 0;
-		for (const i of nodeCollection) {
-			for (const j of adj[i]) {
-				if (groupIdMap[i].has(j)) {
+		let time = 1;
+		function dfsTree(i) {
+			dfsEnterTimes[i] = time;
+			time++;
+			for (const j of planarOrdering[i]) {
+				if (dfsTreeHeights[j] != null) {
 					continue;
 				}
-				id++;
-				console.log(id);
-				let a = i;
-				let b = j;
-				let s = 0;
-				do {
-					console.log(a + " -> " + b);
-					groupIdMap[a].set(b, [id, s]);
-					const c = nextNodeMap[b].get(a);
-					a = b;
-					b = c;
-					s++;
-				}
-				while (a != i || b != j);
-				groupSizeMap[id] = s;
+				dfsTreeHeights[j] = dfsTreeHeights[i] + 1;
+				dfsTree(j);
 			}
+			dfsLeaveTimes[i] = time;
+			time++;
+		}
+		for (const i in nodes) {
+			if (dfsTreeHeights[i] != null) {
+				continue;
+			}
+			dfsTreeHeights[i] = 0;
+			dfsTree(i);
 		}
 	}
 }
@@ -528,7 +496,7 @@ function update() {
 			const v = new Set();
 			function dfs(g, i) {
 				g.push(i);
-				for (const j of adj[i]) {
+				for (const j of unorderedNeighbors[i]) {
 					if (v.has(j)) {
 						continue;
 					}
@@ -588,7 +556,7 @@ function update() {
 			if (l > 1e-3) {
 				const n = d.div(l);
 				const error = n.mul(springDistance - l);
-				const tv = error.mul(springDistance > l ? 0.2 : 0.03);
+				const tv = error.mul(springDistance > l ? 0.2 : 0.06);
 				const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
 				const impulse = tv.sub(rv).mul(0.5);
 				applyImpulse(a, impulse.neg());
@@ -722,13 +690,276 @@ function update() {
 		function getNormal(e) {
 			return nodes[e.b].p.sub(nodes[e.a].p).norm().left();
 		}
-		function getEffectiveNormal(e, i) {
-			const a = nodes[e.a].p;
-			const n = nodes[e.b].p.sub(a).norm().left();
-			const d = nodes[i].p.sub(a).dot(n);
+		// function getDirection(e, f) {
+			// const ra = dfsTreeHeights[f.a];
+			// const rb = dfsTreeHeights[f.b];
+			// const n = getNormal(e);
+			// if (ra == null && rb == null) {
+				// return n;
+			// }
+			// let d = 0;
+			// if (ra > rb) {
+				// d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
+			// }
+			// if (rb > ra) {
+				// d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
+			// }
 			// return n.mul(Math.sign(d));
-			return n.mul(d + nodeDistanceMin * Math.sign(d));
+		// }
+		{
+			
+/*
+okay, can you implement my logic i will discribe below?
+
+we are trying to untangle a planar graph. we do this by considering a DFS tree along with a known planar rotation system that has been computed by an oracle. we deal with edge-edge intersections in different way depending on the kinds and relation of the two edges.
+
+for now, the complexity of your untangle code doesnt matter. you can write the most inefficient algorithms, just make the logic correct!
+
+HERE IS THE SETUP CODE, YOU MUST NOT CHANGE THIS. IT RUNS BEFORE YOUR INTERSECTION HANDLER:
+
+nodes = ... // any number keyed nodes, '.length' is irrelevant. you must use the keys (or for..in loop)
+undirectedEdges = ... // duplicates removed edge list
+
+{
+	const nodeCollection = Object.keys(nodes).map(Number);
+	const planarEdges = undirectedEdges.map(e => [e.a, e.b]);
+	planarOrdering = getPlanarOrdering(nodeCollection, planarEdges);
+	dfsTreeHeights = [];
+	dfsEnterTimes = [];
+	dfsLeaveTimes = [];
+	if (planarOrdering) { // HINT: we have a planar graph, so this is always true!
+		console.log(planarOrdering);
+		let time = 1;
+		function dfsTree(i) {
+			dfsEnterTimes[i] = time;
+			time++;
+			for (const j of planarOrdering[i]) {
+				if (dfsTreeHeights[j] != null) {
+					continue;
+				}
+				dfsTreeHeights[j] = dfsTreeHeights[i] + 1;
+				dfsTree(j);
+			}
+			dfsLeaveTimes[i] = time;
+			time++;
 		}
+		for (const i in nodes) {
+			if (dfsTreeHeights[i] != null) {
+				continue;
+			}
+			dfsTreeHeights[i] = 0;
+			dfsTree(i);
+		}
+	}
+}
+
+HERE IS THE INTERSECTION LOGIC YOU MUST COMPLETE
+
+{
+	function getNormal(e) {
+		return nodes[e.b].p.sub(nodes[e.a].p).norm().left();
+	}
+	function getDirection(e, f) {
+		// HINT: this is the function you must rewrite!
+		// for now it only checks the heights, which can untangle trees but not any planar graph
+		const ra = dfsTreeHeights[f.a];
+		const rb = dfsTreeHeights[f.b];
+		const n = getNormal(e);
+		if (ra == null && rb == null) {
+			return n;
+		}
+		let d = 0;
+		if (ra > rb) {
+			d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
+		}
+		if (rb > ra) {
+			d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
+		}
+		return n.mul(Math.sign(d));
+	}
+}
+
+HOW YOUR CODE WILL BE USED, WHICH YOU CANNOT CHANGE
+
+{
+	for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
+		const d = new Vector(dx, dy);
+		const l = Math.sqrt(lsq);
+		let error;
+		if (l < 1e-3) {
+			// intersection
+			if (e1.a == e1.b || e2.a == e2.b) {
+				continue;
+			}
+			const d1 = getDirection(e1, e2);
+			const d2 = getDirection(e2, e1);
+			error = d2.sub(d1);
+		}
+		else {
+			// ... proximity ...
+			error = ...
+		}
+		error = error.mul(nodeDistanceMin - l);
+		const r = error.len();
+		if (r < 1e-3) {
+			continue;
+		}
+		const n = error.div(r);
+		const v1 = nodes[e1.a].v.mul(1 - s).add(nodes[e1.b].v.mul(s));
+		const v2 = nodes[e2.a].v.mul(1 - t).add(nodes[e2.b].v.mul(t));
+		const dv = v2.sub(v1);
+		const da = r * 0.6 - n.dot(dv);
+		if (da <= 0) {
+			continue;
+		}
+		const impulse = n.mul(da * 0.5);
+		applyImpulse(e1.a, impulse.mul(-1 + s));
+		applyImpulse(e1.b, impulse.mul(-s));
+		applyImpulse(e2.a, impulse.mul(1 - t));
+		applyImpulse(e2.b, impulse.mul(t));
+	}
+}
+
+THE EXTENDED PLANAR GRAPH UNTANGLER LOGIC
+
+we must ensure when solving intersections, we fix the winding of node neighbors to be as in the 'planarOrdering' adjacency list!
+we do so by moving one node of 'e2' to the other side of 'e1' along it's normal
+
+case 1: both are tree edges, and unrelated:
+
+	find the LCA and check the winding of both branches compared to the parent edge (imagine a default root edge of 0-1 so all LCAs have a parent edge). 
+
+		- if these 3 edges are wound correctly, move towards the lower end (like in the tree solver)
+		
+		- if the winding is incorrect, move towards the higher node, thus "swapping" the two branches
+		
+case 2: both are tree edges, and e2.a is a descendant of e1.b:
+
+	move e1.a to the other side, to shorten the middle "loop"
+
+case 3: both are tree edges, and e1.a is a descendant of e2.b:
+
+	do nothing - the case 2 will handle the other round
+	
+FOR NOW, THIS IS IT. WE IGNORE BACK EDGES TO SEE IF AT LEAST THIS WORKS
+
+before writing the code, explain how you understood the problem, whether my logic is correct in your opinion (and if not, how would you fix it) and your approach to implement it!
+
+*/
+			// Helper: Check if u is an ancestor of v (or u == v)
+			function isAncestor(u, v) {
+				return dfsEnterTimes[u] <= dfsEnterTimes[v] && dfsLeaveTimes[u] >= dfsLeaveTimes[v];
+			}
+
+			// Helper: Find the LCA of two nodes
+			function getLCA(u, v) {
+				let current = u;
+				// Inefficient but correct as requested
+				while (current !== undefined) {
+					if (isAncestor(current, v)) return current;
+					// Find parent in DFS tree
+					let parent = undefined;
+					for (let neighbor of planarOrdering[current]) {
+						if (dfsTreeHeights[neighbor] === dfsTreeHeights[current] - 1 && isAncestor(neighbor, current)) {
+							parent = neighbor;
+							break;
+						}
+					}
+					current = parent;
+				}
+				return current;
+			}
+
+			// Helper: Find which immediate child of 'ancestor' leads to 'descendant'
+			function getBranchPoint(ancestor, descendant) {
+				if (ancestor === descendant) return null;
+				for (const child of planarOrdering[ancestor]) {
+					// Only consider tree-edge children
+					if (dfsTreeHeights[child] === dfsTreeHeights[ancestor] + 1 && isAncestor(child, descendant)) {
+						return child;
+					}
+				}
+				return null;
+			}
+
+			function getNormal(e) {
+				return nodes[e.b].p.sub(nodes[e.a].p).norm().left();
+			}
+
+			function getDirection2(e, f) {
+				const n = getNormal(e);
+				
+				// Check for Case 2: f.a is descendant of e.b (e is ancestor of f)
+				// We move e.a to shorten the loop
+				if (isAncestor(e.b, f.a)) {
+					const d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
+					return n.mul(Math.sign(d));
+				}
+
+				// Case 3: Symmetric (handled by the caller calling getDirection(e2, e1))
+				const descendant = isAncestor(f.b, e.a);
+
+				// Case 1: Unrelated branches - Check Winding at LCA
+				const lca = descendant ? null : getLCA(e.a, f.a);
+				if (lca != null) {
+					const branchE = getBranchPoint(lca, e.a);
+					const branchF = getBranchPoint(lca, f.a);
+
+					if (branchE !== null && branchF !== null && branchE !== branchF) {
+						// Find parent of LCA to orient the rotation
+						let parentLca = planarOrdering[lca].find(nb => dfsTreeHeights[nb] === dfsTreeHeights[lca] - 1);
+						
+						const neighbors = planarOrdering[lca];
+						const pIdx = neighbors.indexOf(parentLca); // If -1 (root), start at 0
+						const start = pIdx === -1 ? 0 : pIdx;
+
+						// Linearize cyclic order relative to parent
+						const sorted = [];
+						for (let i = 0; i < neighbors.length; i++) {
+							sorted.push(neighbors[(start + i) % neighbors.length]);
+						}
+
+						const orderE = sorted.indexOf(branchE);
+						const orderF = sorted.indexOf(branchF);
+
+						// Correct winding: orderE should be < orderF (or vice versa depending on your CCW/CW)
+						// If physical reality matches topological order, move to lower end (tree solver)
+						// If they are swapped, move to higher node to force a cross-back
+						const physicallyEIsLeftOfF = n.dot(nodes[f.a].p.sub(nodes[e.a].p)) > 0;
+						const topologicallyEIsLeftOfF = orderE < orderF;
+
+						const ra = dfsTreeHeights[f.a];
+						const rb = dfsTreeHeights[f.b];
+						let targetNode = ra > rb ? f.a : f.b;
+
+						if (physicallyEIsLeftOfF !== topologicallyEIsLeftOfF) {
+							// WRONG SIDE: Move the higher node to force the swap
+							targetNode = ra < rb ? f.a : f.b; 
+						} else {
+							// CORRECT SIDE: Push away from lower node
+							targetNode = ra > rb ? f.a : f.b;
+						}
+						
+						if (targetNode == e.a) {
+							return new Vector(0, 0);
+						}
+
+						const d = n.dot(nodes[targetNode].p.sub(nodes[e.a].p));
+						return n.mul(Math.sign(d));
+					}
+				}
+
+				// Default tree logic
+				const ra = dfsTreeHeights[f.a];
+				const rb = dfsTreeHeights[f.b];
+				let d = 0;
+				if (ra > rb) d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
+				else if (rb > ra) d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
+				
+				return n.mul(Math.sign(d));
+			}
+		}
+		const getDirection = getDirection2;
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
@@ -737,46 +968,9 @@ function update() {
 				if (e1.a == e1.b || e2.a == e2.b) {
 					continue;
 				}
-				error = new Vector();
-				for (let t = 0; t < 2; t++) {
-					let p11 = groupIdMap[e1.a].get(e1.b);
-					let p12 = groupIdMap[e1.b].get(e1.a);
-					let p21 = groupIdMap[e2.a].get(e2.b);
-					let p22 = groupIdMap[e2.b].get(e2.a);
-					let local = new Vector();
-					for (let ty = 0; ty < 2; ty++) {
-						for (let tt = 0; tt < 2; tt++) {
-							const id = p11[0];
-							if (id == p21[0]) {
-								const k = groupSizeMap[id];
-								const s1 = p11[1];
-								const s2 = p21[1];
-								if ((s2 - s1 + k) % k >= (s1 - s2 + k) % k + 0 + 1 * (s1 < s2)) {
-									let n = getEffectiveNormal(e2, id == 1 ? e1.b : e1.a);
-									local = local.add(n);
-								}
-								if (false) {
-									let n = getNormal(e1);
-									local = local.add(n);
-								}
-							}
-							[e2.a, e2.b] = [e2.b, e2.a];
-							[p21, p22] = [p22, p21];
-						}
-						[e1.a, e1.b] = [e1.b, e1.a];
-						[p11, p12] = [p12, p11];
-						local = local.neg();
-					}
-					[e1, e2] = [e2, e1];
-					error = error.add(local);
-					error = error.neg();
-				}
-				error = error.neg();
-				// !!!
-				// const d1 = getDirection(e1, e2);
-				// const d2 = getDirection(e2, e1);
-				// error = d2.sub(d1);
-				// error = error.mul(nodeDistanceMin - l);
+				const d1 = getDirection(e1, e2);
+				const d2 = getDirection(e2, e1);
+				error = d2.sub(d1);
 			}
 			else {
 				if (nodes[e1.a].neighbors.has(e2)) {
@@ -792,11 +986,8 @@ function update() {
 					continue;
 				}
 				error = d.div(l);
-				error = error.mul(nodeDistanceMin - l);
-				// !!!
-				error = error.mul(0.1);
-				// continue;
 			}
+			error = error.mul(nodeDistanceMin - l);
 			const r = error.len();
 			if (r < 1e-3) {
 				continue;
