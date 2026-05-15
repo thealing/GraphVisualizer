@@ -577,6 +577,7 @@ function update() {
 			edgeNodes[i * 2 + 1] = Number(e.b);
 		}
 		const edgeContacts = [];
+		const edgeIntersections = [];
 		for (let i = 0; i < edgeArray.length; i++) {
 			const x1 = edgePoints[i * 4 + 0], y1 = edgePoints[i * 4 + 1];
 			const x2 = edgePoints[i * 4 + 2], y2 = edgePoints[i * 4 + 3];
@@ -678,12 +679,17 @@ function update() {
 				}
 				const e1 = edgeArray[i];
 				const e2 = edgeArray[j];
-				edgeContacts.push([e1, e2, dx, dy, lsq, s, t]);
 				if (lsq < 1e-6) {
+					const entry = [e1, e2, s, t];
+					edgeIntersections.push(entry);
 					nodes[e1.a].neighbors.add(e2);
 					nodes[e1.b].neighbors.add(e2);
 					nodes[e2.a].neighbors.add(e1);
 					nodes[e2.b].neighbors.add(e1);
+				}
+				else {
+					const entry = [e1, e2, dx, dy, lsq, s, t];
+					edgeContacts.push(entry);
 				}
 			}
 		}
@@ -753,90 +759,54 @@ function update() {
 			const index3 = neighbors.indexOf(b3);
 			const s2 = (index2 - index1 + neighbors.length) % neighbors.length;
 			const s3 = (index3 - index1 + neighbors.length) % neighbors.length;
-			const ccw = s2 < s3;
 			const p = nodes[a].p;
 			const v1 = nodes[b1].p.sub(p);
 			const v2 = nodes[b2].p.sub(p);
 			const v3 = nodes[b3].p.sub(p);
-			const c12 = v1.cross(v2);
-			const c23 = v2.cross(v3);
-			const c31 = v3.cross(v1);
-			const o = c12 > 0 && c23 > 0 || c23 > 0 && c31 > 0 || c31 > 0 && c12 > 0;
-			return o == ccw;
-		}
-		function getTreeDirection(a1, b1, a2, b2) {
-			const t1 = dfsTreeHeights[a1] + 1 == dfsTreeHeights[b1];
-			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
-			if (t1 && t2) {
-				if (isDescent(b1, a2) || isDescent(b2, a1)) {
-					const n1 = getDirectedNormal(a1, b1, b2);
-					const n2 = getDirectedNormal(a2, b2, a1);
-					return [n1, n2];
-				}
-				const hca = getHCA(b1, b2);
-				if (hca != null) {
-					const root = dfsTreeParents[hca.p];
-					if (root == null || isWindingCorrect(hca.p, root, hca.c1, hca.c2)) {
-						const n1 = getDirectedNormal(a1, b1, b2);
-						const n2 = getDirectedNormal(a2, b2, b1);
-						return [n1, n2];
-					}
-					else {
-						const n1 = getDirectedNormal(a1, b1, a2);
-						const n2 = getDirectedNormal(a2, b2, a1);
-						return [n1, n2];
-					}
-				}
-			}
-			return null;
+			const r2 = v2.sub(v1);
+			const r3 = v3.sub(v1);
+			return (r2.cross(r3) < 0) == (s2 < s3);
 		}
 		function getDirection(e1, e2) {
 			const [a1, b1] = orientEdge(e1.a, e1.b);
 			const [a2, b2] = orientEdge(e2.a, e2.b);
-			const a = getTreeDirection(a1, b1, a2, b2);
-			if (a == null) {
-				return new Vector(0, 0);
+			const t1 = dfsTreeHeights[a1] + 1 == dfsTreeHeights[b1];
+			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
+			if (t1 && t2) {
+				if (isDescent(b1, a2)) {
+					nodes[e1.a].neighbors.delete(e2);
+					nodes[e1.b].neighbors.delete(e2);
+					const n = getDirectedNormal(a1, b1, a2);
+					return n;
+				}
+				if (isDescent(b2, a1)) {
+					nodes[e2.a].neighbors.delete(e1);
+					nodes[e2.b].neighbors.delete(e1);
+					const n = getDirectedNormal(a2, b2, a1);
+					return n;
+				}
+				// const hca = getHCA(b1, b2);
+				// if (hca != null) {
+					// const root = dfsTreeParents[hca.p];
+					// if (root == null || isWindingCorrect(hca.p, root, hca.c1, hca.c2)) {
+						// const n1 = getDirectedNormal(a1, b1, b2);
+						// const n2 = getDirectedNormal(a2, b2, b1);
+						// return [n1, n2];
+					// }
+					// else {
+						// const n1 = hca.p == a2 ? new Vector(0, 0) : getDirectedNormal(a1, b1, a2);
+						// const n2 = hca.p == a1 ? new Vector(0, 0) : getDirectedNormal(a2, b2, a1);
+						// return [n1, n2];
+					// }
+					
+				// }
 			}
-			let [n1, n2] = a;
-			if (a1 != e1.a) {
-				n1 = n1.neg();
-			}
-			if (a2 != e2.a) {
-				n2 = n2.neg();
-			}
-			return n2.sub(n1);
+			return new Vector(0, 0);
 		}
-		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
-			const d = new Vector(dx, dy);
-			const l = Math.sqrt(lsq);
-			let error;
-			if (l < 1e-3) {
-				if (e1.a == e1.b || e2.a == e2.b) {
-					continue;
-				}
-				error = getDirection(e1, e2);
-			}
-			else {
-				if (nodes[e1.a].neighbors.has(e2)) {
-					continue;
-				}
-				if (nodes[e1.b].neighbors.has(e2)) {
-					continue;
-				}
-				if (nodes[e2.a].neighbors.has(e1)) {
-					continue;
-				}
-				if (nodes[e2.b].neighbors.has(e1)) {
-					continue;
-				}
-				error = d.div(l);
-				// !!!
-				// error = new Vector(0, 0);
-			}
-			error = error.mul(nodeDistanceMin - l);
+		function applyEdgeImpulse(e1, e2, s, t, error) {
 			const r = error.len();
 			if (r < 1e-3) {
-				continue;
+				return;
 			}
 			const n = error.div(r);
 			const v1 = nodes[e1.a].v.mul(1 - s).add(nodes[e1.b].v.mul(s));
@@ -844,13 +814,40 @@ function update() {
 			const dv = v2.sub(v1);
 			const da = r * 0.6 - n.dot(dv);
 			if (da <= 0) {
-				continue;
+				return;
 			}
 			const impulse = n.mul(da * 0.5);
 			applyImpulse(e1.a, impulse.mul(-1 + s));
 			applyImpulse(e1.b, impulse.mul(-s));
 			applyImpulse(e2.a, impulse.mul(1 - t));
 			applyImpulse(e2.b, impulse.mul(t));
+		}
+		for (let [e1, e2, s, t] of edgeIntersections) {
+			if (e1.a == e1.b || e2.a == e2.b) {
+				continue;
+			}
+			let error = getDirection(e1, e2);
+			error = error.mul(nodeDistanceMin);
+			applyEdgeImpulse(e1, e2, s, t, error);
+		}
+		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
+			const d = new Vector(dx, dy);
+			const l = Math.sqrt(lsq);
+			if (nodes[e1.a].neighbors.has(e2)) {
+				continue;
+			}
+			if (nodes[e1.b].neighbors.has(e2)) {
+				continue;
+			}
+			if (nodes[e2.a].neighbors.has(e1)) {
+				continue;
+			}
+			if (nodes[e2.b].neighbors.has(e1)) {
+				continue;
+			}
+			let error = d.div(l);
+			error = error.mul(nodeDistanceMin - l);
+			applyEdgeImpulse(e1, e2, s, t, error);
 		}
 		for (const u in nodes) {
 			break; //!!!!
