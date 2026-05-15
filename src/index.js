@@ -782,24 +782,23 @@ function update() {
 				if (isDescent(b2, a1)) {
 					nodes[e2.a].neighbors.delete(e1);
 					nodes[e2.b].neighbors.delete(e1);
-					const n = getDirectedNormal(a2, b2, a1);
+					const n = getDirectedNormal(a2, b2, b1);
 					return n;
 				}
-				// const hca = getHCA(b1, b2);
-				// if (hca != null) {
-					// const root = dfsTreeParents[hca.p];
+				const hca = getHCA(b1, b2);
+				if (hca != null) {
+					const root = dfsTreeParents[hca.p];
 					// if (root == null || isWindingCorrect(hca.p, root, hca.c1, hca.c2)) {
-						// const n1 = getDirectedNormal(a1, b1, b2);
-						// const n2 = getDirectedNormal(a2, b2, b1);
-						// return [n1, n2];
+						const n1 = getDirectedNormal(a1, b1, b2);
+						const n2 = getDirectedNormal(a2, b2, b1);
+						return n2.sub(n1);
 					// }
 					// else {
 						// const n1 = hca.p == a2 ? new Vector(0, 0) : getDirectedNormal(a1, b1, a2);
 						// const n2 = hca.p == a1 ? new Vector(0, 0) : getDirectedNormal(a2, b2, a1);
 						// return [n1, n2];
 					// }
-					
-				// }
+				}
 			}
 			return new Vector(0, 0);
 		}
