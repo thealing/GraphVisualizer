@@ -81,6 +81,7 @@ function onUpdate() {
 	const planarEdges = undirectedEdges.map(e => [e.a, e.b]);
 	planarOrdering = getPlanarOrdering(nodeCollection, planarEdges);
 	dfsTreeHeights = [];
+	dfsTreeParents = [];
 	dfsEnterTimes = [];
 	dfsLeaveTimes = [];
 	if (planarOrdering) {
@@ -94,12 +95,13 @@ function onUpdate() {
 					continue;
 				}
 				dfsTreeHeights[j] = dfsTreeHeights[i] + 1;
+				dfsTreeParents[j] = i;
 				dfsTree(j);
 			}
 			dfsLeaveTimes[i] = time;
 			time++;
 		}
-		for (const i in nodes) {
+		for (const i of nodeCollection) {
 			if (dfsTreeHeights[i] != null) {
 				continue;
 			}
@@ -683,283 +685,127 @@ function update() {
 					nodes[e2.a].neighbors.add(e1);
 					nodes[e2.b].neighbors.add(e1);
 				}
-				// !!!
-				else if(e1.a!=e1.b&&e2.a!=e2.b)edgeContacts.pop();
 			}
 		}
-		function getNormal(e) {
-			return nodes[e.b].p.sub(nodes[e.a].p).norm().left();
+		function getNormal(a, b) {
+			return nodes[b].p.sub(nodes[a].p).norm().left();
 		}
-		// function getDirection(e, f) {
-			// const ra = dfsTreeHeights[f.a];
-			// const rb = dfsTreeHeights[f.b];
-			// const n = getNormal(e);
-			// if (ra == null && rb == null) {
-				// return n;
-			// }
-			// let d = 0;
-			// if (ra > rb) {
-				// d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
-			// }
-			// if (rb > ra) {
-				// d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
-			// }
-			// return n.mul(Math.sign(d));
-		// }
+		function getDirectedNormal(a, b, i) {
+			const n = nodes[b].p.sub(nodes[a].p).norm().left();
+			const d = nodes[i].p.sub(nodes[a].p).dot(n);
+			const s = Math.sign(d);
+			return n.mul(s);
+		}
+		function isDescent(u, v) {
+			return dfsEnterTimes[u] <= dfsEnterTimes[v] && dfsLeaveTimes[u] >= dfsLeaveTimes[v];
+    }
+		function orientEdge(a, b) {
+			if (dfsTreeHeights[b] < dfsTreeHeights[a]) {
+				[a, b] = [b, a];
+			}
+			if (dfsTreeHeights[b] != dfsTreeHeights[a] + 1) {
+				[a, b] = [b, a];
+			}
+			return [a, b];
+		}
+		
 		{
-			
-/*
-okay, can you implement my logic i will discribe below?
-
-we are trying to untangle a planar graph. we do this by considering a DFS tree along with a known planar rotation system that has been computed by an oracle. we deal with edge-edge intersections in different way depending on the kinds and relation of the two edges.
-
-for now, the complexity of your untangle code doesnt matter. you can write the most inefficient algorithms, just make the logic correct!
-
-HERE IS THE SETUP CODE, YOU MUST NOT CHANGE THIS. IT RUNS BEFORE YOUR INTERSECTION HANDLER:
-
-nodes = ... // any number keyed nodes, '.length' is irrelevant. you must use the keys (or for..in loop)
-undirectedEdges = ... // duplicates removed edge list
-
-{
-	const nodeCollection = Object.keys(nodes).map(Number);
-	const planarEdges = undirectedEdges.map(e => [e.a, e.b]);
-	planarOrdering = getPlanarOrdering(nodeCollection, planarEdges);
-	dfsTreeHeights = [];
-	dfsEnterTimes = [];
-	dfsLeaveTimes = [];
-	if (planarOrdering) { // HINT: we have a planar graph, so this is always true!
-		console.log(planarOrdering);
-		let time = 1;
-		function dfsTree(i) {
-			dfsEnterTimes[i] = time;
-			time++;
-			for (const j of planarOrdering[i]) {
-				if (dfsTreeHeights[j] != null) {
-					continue;
-				}
-				dfsTreeHeights[j] = dfsTreeHeights[i] + 1;
-				dfsTree(j);
-			}
-			dfsLeaveTimes[i] = time;
-			time++;
-		}
-		for (const i in nodes) {
-			if (dfsTreeHeights[i] != null) {
-				continue;
-			}
-			dfsTreeHeights[i] = 0;
-			dfsTree(i);
-		}
-	}
-}
-
-HERE IS THE INTERSECTION LOGIC YOU MUST COMPLETE
-
-{
-	function getNormal(e) {
-		return nodes[e.b].p.sub(nodes[e.a].p).norm().left();
-	}
-	function getDirection(e, f) {
-		// HINT: this is the function you must rewrite!
-		// for now it only checks the heights, which can untangle trees but not any planar graph
-		const ra = dfsTreeHeights[f.a];
-		const rb = dfsTreeHeights[f.b];
-		const n = getNormal(e);
-		if (ra == null && rb == null) {
-			return n;
-		}
-		let d = 0;
-		if (ra > rb) {
-			d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
-		}
-		if (rb > ra) {
-			d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
-		}
-		return n.mul(Math.sign(d));
-	}
-}
-
-HOW YOUR CODE WILL BE USED, WHICH YOU CANNOT CHANGE
-
-{
-	for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
-		const d = new Vector(dx, dy);
-		const l = Math.sqrt(lsq);
-		let error;
-		if (l < 1e-3) {
-			// intersection
-			if (e1.a == e1.b || e2.a == e2.b) {
-				continue;
-			}
-			const d1 = getDirection(e1, e2);
-			const d2 = getDirection(e2, e1);
-			error = d2.sub(d1);
-		}
-		else {
-			// ... proximity ...
-			error = ...
-		}
-		error = error.mul(nodeDistanceMin - l);
-		const r = error.len();
-		if (r < 1e-3) {
-			continue;
-		}
-		const n = error.div(r);
-		const v1 = nodes[e1.a].v.mul(1 - s).add(nodes[e1.b].v.mul(s));
-		const v2 = nodes[e2.a].v.mul(1 - t).add(nodes[e2.b].v.mul(t));
-		const dv = v2.sub(v1);
-		const da = r * 0.6 - n.dot(dv);
-		if (da <= 0) {
-			continue;
-		}
-		const impulse = n.mul(da * 0.5);
-		applyImpulse(e1.a, impulse.mul(-1 + s));
-		applyImpulse(e1.b, impulse.mul(-s));
-		applyImpulse(e2.a, impulse.mul(1 - t));
-		applyImpulse(e2.b, impulse.mul(t));
-	}
-}
-
-THE EXTENDED PLANAR GRAPH UNTANGLER LOGIC
-
-we must ensure when solving intersections, we fix the winding of node neighbors to be as in the 'planarOrdering' adjacency list!
-we do so by moving one node of 'e2' to the other side of 'e1' along it's normal
-
-case 1: both are tree edges, and unrelated:
-
-	find the LCA and check the winding of both branches compared to the parent edge (imagine a default root edge of 0-1 so all LCAs have a parent edge). 
-
-		- if these 3 edges are wound correctly, move towards the lower end (like in the tree solver)
-		
-		- if the winding is incorrect, move towards the higher node, thus "swapping" the two branches
-		
-case 2: both are tree edges, and e2.a is a descendant of e1.b:
-
-	move e1.a to the other side, to shorten the middle "loop"
-
-case 3: both are tree edges, and e1.a is a descendant of e2.b:
-
-	do nothing - the case 2 will handle the other round
-	
-FOR NOW, THIS IS IT. WE IGNORE BACK EDGES TO SEE IF AT LEAST THIS WORKS
-
-before writing the code, explain how you understood the problem, whether my logic is correct in your opinion (and if not, how would you fix it) and your approach to implement it!
-
-*/
-			// Helper: Check if u is an ancestor of v (or u == v)
 			function isAncestor(u, v) {
-				return dfsEnterTimes[u] <= dfsEnterTimes[v] && dfsLeaveTimes[u] >= dfsLeaveTimes[v];
+        return dfsEnterTimes[u] <= dfsEnterTimes[v] && dfsLeaveTimes[u] >= dfsLeaveTimes[v];
 			}
 
-			// Helper: Find the LCA of two nodes
-			function getLCA(u, v) {
-				let current = u;
-				// Inefficient but correct as requested
-				while (current !== undefined) {
-					if (isAncestor(current, v)) return current;
-					// Find parent in DFS tree
-					let parent = undefined;
-					for (let neighbor of planarOrdering[current]) {
-						if (dfsTreeHeights[neighbor] === dfsTreeHeights[current] - 1 && isAncestor(neighbor, current)) {
-							parent = neighbor;
-							break;
-						}
+
+			// Helper: Get the first node on the path from the LCA towards the target
+			function getChildTowards(lca, target) {
+					if (lca === target) return target;
+					for (const child of planarOrdering[lca]) {
+							// Only consider tree edges leading down
+							if (dfsTreeHeights[child] === dfsTreeHeights[lca] + 1 && isAncestor(child, target)) {
+									return child;
+							}
 					}
-					current = parent;
-				}
-				return current;
+					return target;
 			}
-
-			// Helper: Find which immediate child of 'ancestor' leads to 'descendant'
-			function getBranchPoint(ancestor, descendant) {
-				if (ancestor === descendant) return null;
-				for (const child of planarOrdering[ancestor]) {
-					// Only consider tree-edge children
-					if (dfsTreeHeights[child] === dfsTreeHeights[ancestor] + 1 && isAncestor(child, descendant)) {
-						return child;
+			
+			// Helper: Find LCA of two nodes
+			function getHCA(u, v) {
+					let curr = u;
+					while (curr != null) {
+							if (isAncestor(curr, v)) return { p: curr, c1: getChildTowards(curr,u),c2:getChildTowards(curr,v) };
+							// Find parent in DFS tree (node with height H-1 connected to curr)
+							let parent = null;
+							for (const neighbor of planarOrdering[curr]) {
+									if (dfsTreeHeights[neighbor] === dfsTreeHeights[curr] - 1 && isAncestor(neighbor, curr)) {
+											parent = neighbor;
+											break;
+									}
+							}
+							curr = parent;
 					}
-				}
-				return null;
-			}
-
-			function getNormal(e) {
-				return nodes[e.b].p.sub(nodes[e.a].p).norm().left();
-			}
-
-			function getDirection2(e, f) {
-				const n = getNormal(e);
-				
-				// Check for Case 2: f.a is descendant of e.b (e is ancestor of f)
-				// We move e.a to shorten the loop
-				if (isAncestor(e.b, f.a)) {
-					const d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
-					return n.mul(Math.sign(d));
-				}
-
-				// Case 3: Symmetric (handled by the caller calling getDirection(e2, e1))
-				const descendant = isAncestor(f.b, e.a);
-
-				// Case 1: Unrelated branches - Check Winding at LCA
-				const lca = descendant ? null : getLCA(e.a, f.a);
-				if (lca != null) {
-					const branchE = getBranchPoint(lca, e.a);
-					const branchF = getBranchPoint(lca, f.a);
-
-					if (branchE !== null && branchF !== null && branchE !== branchF) {
-						// Find parent of LCA to orient the rotation
-						let parentLca = planarOrdering[lca].find(nb => dfsTreeHeights[nb] === dfsTreeHeights[lca] - 1);
-						
-						const neighbors = planarOrdering[lca];
-						const pIdx = neighbors.indexOf(parentLca); // If -1 (root), start at 0
-						const start = pIdx === -1 ? 0 : pIdx;
-
-						// Linearize cyclic order relative to parent
-						const sorted = [];
-						for (let i = 0; i < neighbors.length; i++) {
-							sorted.push(neighbors[(start + i) % neighbors.length]);
-						}
-
-						const orderE = sorted.indexOf(branchE);
-						const orderF = sorted.indexOf(branchF);
-
-						// Correct winding: orderE should be < orderF (or vice versa depending on your CCW/CW)
-						// If physical reality matches topological order, move to lower end (tree solver)
-						// If they are swapped, move to higher node to force a cross-back
-						const physicallyEIsLeftOfF = n.dot(nodes[f.a].p.sub(nodes[e.a].p)) > 0;
-						const topologicallyEIsLeftOfF = orderE < orderF;
-
-						const ra = dfsTreeHeights[f.a];
-						const rb = dfsTreeHeights[f.b];
-						let targetNode = ra > rb ? f.a : f.b;
-
-						if (physicallyEIsLeftOfF !== topologicallyEIsLeftOfF) {
-							// WRONG SIDE: Move the higher node to force the swap
-							targetNode = ra < rb ? f.a : f.b; 
-						} else {
-							// CORRECT SIDE: Push away from lower node
-							targetNode = ra > rb ? f.a : f.b;
-						}
-						
-						if (targetNode == e.a) {
-							return new Vector(0, 0);
-						}
-
-						const d = n.dot(nodes[targetNode].p.sub(nodes[e.a].p));
-						return n.mul(Math.sign(d));
-					}
-				}
-
-				// Default tree logic
-				const ra = dfsTreeHeights[f.a];
-				const rb = dfsTreeHeights[f.b];
-				let d = 0;
-				if (ra > rb) d = n.dot(nodes[f.a].p.sub(nodes[e.a].p));
-				else if (rb > ra) d = n.dot(nodes[f.b].p.sub(nodes[e.a].p));
-				
-				return n.mul(Math.sign(d));
+					return null;
 			}
 		}
-		const getDirection = getDirection2;
+		
+		function isWindingCorrect(a, b1, b2, b3) {
+			const neighbors = planarOrdering[a];
+			const index1 = neighbors.indexOf(b1);
+			const index2 = neighbors.indexOf(b2);
+			const index3 = neighbors.indexOf(b3);
+			const s2 = (index2 - index1 + neighbors.length) % neighbors.length;
+			const s3 = (index3 - index1 + neighbors.length) % neighbors.length;
+			const ccw = s2 < s3;
+			const p = nodes[a].p;
+			const v1 = nodes[b1].p.sub(p);
+			const v2 = nodes[b2].p.sub(p);
+			const v3 = nodes[b3].p.sub(p);
+			const c12 = v1.cross(v2);
+			const c23 = v2.cross(v3);
+			const c31 = v3.cross(v1);
+			const o = c12 > 0 && c23 > 0 || c23 > 0 && c31 > 0 || c31 > 0 && c12 > 0;
+			return o == ccw;
+		}
+		function getTreeDirection(a1, b1, a2, b2) {
+			const t1 = dfsTreeHeights[a1] + 1 == dfsTreeHeights[b1];
+			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
+			if (t1 && t2) {
+				if (isDescent(b1, a2) || isDescent(b2, a1)) {
+					const n1 = getDirectedNormal(a1, b1, b2);
+					const n2 = getDirectedNormal(a2, b2, a1);
+					return [n1, n2];
+				}
+				const hca = getHCA(b1, b2);
+				if (hca != null) {
+					const root = dfsTreeParents[hca.p];
+					if (root == null || isWindingCorrect(hca.p, root, hca.c1, hca.c2)) {
+						const n1 = getDirectedNormal(a1, b1, b2);
+						const n2 = getDirectedNormal(a2, b2, b1);
+						return [n1, n2];
+					}
+					else {
+						const n1 = getDirectedNormal(a1, b1, a2);
+						const n2 = getDirectedNormal(a2, b2, a1);
+						return [n1, n2];
+					}
+				}
+			}
+			return null;
+		}
+		function getDirection(e1, e2) {
+			const [a1, b1] = orientEdge(e1.a, e1.b);
+			const [a2, b2] = orientEdge(e2.a, e2.b);
+			const a = getTreeDirection(a1, b1, a2, b2);
+			if (a == null) {
+				return new Vector(0, 0);
+			}
+			let [n1, n2] = a;
+			if (a1 != e1.a) {
+				n1 = n1.neg();
+			}
+			if (a2 != e2.a) {
+				n2 = n2.neg();
+			}
+			return n2.sub(n1);
+		}
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
@@ -968,9 +814,7 @@ before writing the code, explain how you understood the problem, whether my logi
 				if (e1.a == e1.b || e2.a == e2.b) {
 					continue;
 				}
-				const d1 = getDirection(e1, e2);
-				const d2 = getDirection(e2, e1);
-				error = d2.sub(d1);
+				error = getDirection(e1, e2);
 			}
 			else {
 				if (nodes[e1.a].neighbors.has(e2)) {
@@ -986,6 +830,8 @@ before writing the code, explain how you understood the problem, whether my logi
 					continue;
 				}
 				error = d.div(l);
+				// !!!
+				// error = new Vector(0, 0);
 			}
 			error = error.mul(nodeDistanceMin - l);
 			const r = error.len();
