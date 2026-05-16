@@ -851,6 +851,7 @@ function update() {
 			}
 			else if (t1) {
 				if (isDescent(b2, a1)) {
+					console.log("way 1");
 					const root = dfsTreeParents[b2];
 					if (root == null) {
 						return getDirectedNormal(a2, b2, b1);
@@ -867,8 +868,10 @@ function update() {
 					}
 					return n;
 				}
-				else {
-					
+				if (isDescent(a1, b2)) {
+					console.log("way 2");
+					const n = getDirectedNormal(a2, b2, a1);
+					return n;
 				}
 			}
 			else if (t2) {
