@@ -85,6 +85,7 @@ function onUpdate() {
 	dfsTreeSizes = [];
 	dfsEnterTimes = [];
 	dfsLeaveTimes = [];
+	dfsChildren = [];
 	if (planarOrdering) {
 		console.log(planarOrdering);
 		let time = 1;
@@ -110,6 +111,9 @@ function onUpdate() {
 			}
 			dfsTreeHeights[i] = 0;
 			dfsTree(i);
+		}
+		for (const i of nodeCollection) {
+			dfsChildren[i] = planarOrdering[i].filter(j => dfsTreeHeights[j] == dfsTreeHeights[i] + 1);
 		}
 	}
 }
@@ -708,6 +712,32 @@ function update() {
 		function isDescent(u, v) {
 			return dfsEnterTimes[u] <= dfsEnterTimes[v] && dfsLeaveTimes[u] >= dfsLeaveTimes[v];
 		}
+		function getChildTowards(p, target) {
+			if (p == target) {
+				return target;
+			}
+			const children = dfsChildren[p];
+			const targetTime = dfsEnterTimes[target];
+			let low = 0;
+			let high = children.length - 1;
+			while (low <= high) {
+				const mid = (low + high) >> 1;
+				const child = children[mid];
+				if (dfsEnterTimes[child] <= targetTime && dfsLeaveTimes[child] >= targetTime) {
+					if (dfsTreeHeights[child] == dfsTreeHeights[p] + 1) {
+						return child;
+					}
+					break;
+				}
+				if (dfsEnterTimes[child] > targetTime) {
+					high = mid - 1;
+				}
+				else {
+					low = mid + 1;
+				}
+			}
+			return target;
+		}
 		function orientEdge(a, b) {
 			if (dfsTreeHeights[b] < dfsTreeHeights[a]) {
 				[a, b] = [b, a];
@@ -718,23 +748,12 @@ function update() {
 			return [a, b];
 		}
 		
-		{
+		{ // SLOP
 			function isAncestor(u, v) {
         return dfsEnterTimes[u] <= dfsEnterTimes[v] && dfsLeaveTimes[u] >= dfsLeaveTimes[v];
 			}
 
-
-			// Helper: Get the first node on the path from the LCA towards the target
-			function getChildTowards(lca, target) {
-					if (lca === target) return target;
-					for (const child of planarOrdering[lca]) {
-							// Only consider tree edges leading down
-							if (dfsTreeHeights[child] === dfsTreeHeights[lca] + 1 && isAncestor(child, target)) {
-									return child;
-							}
-					}
-					return target;
-			}
+			
 			
 			// Helper: Find LCA of two nodes
 			function getHCA(u, v) {
@@ -754,6 +773,7 @@ function update() {
 					return null;
 			}
 		}
+		
 		function getExpectedSide(a, b1, b2, b3) {
 			const neighbors = planarOrdering[a];
 			const index1 = neighbors.indexOf(b1);
@@ -794,7 +814,6 @@ function update() {
 				}
 				const hca = getHCA(b1, b2);
 				if (hca != null) {
-					const neighbors = planarOrdering[hca.p];
 					const root = dfsTreeParents[hca.p];
 					if (root == null) {
 						const n1 = getDirectedNormal(a1, b1, b2);
@@ -829,6 +848,32 @@ function update() {
 					}
 					return error;
 				}
+			}
+			else if (t1) {
+				if (isDescent(b2, a1)) {
+					const root = dfsTreeParents[b2];
+					if (root == null) {
+						return getDirectedNormal(a2, b2, b1);
+					}
+					const child = getChildTowards(b2, a1);
+					const actualSide = getActualSide(b2, root, child, a2);
+					const expectedSide = getExpectedSide(b2, root, child, a2);
+					const difference = expectedSide != actualSide;
+					const n2 = getNormal(a2, b2);
+					const move1 = nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0;
+					let n = getDirectedNormal(a2, b2, difference ? a1 : b1);
+					if (!move1 && !actualSide) {
+						n = n.neg();
+					}
+					return n;
+				}
+				else {
+					
+				}
+			}
+			else if (t2) {
+				const error = getDirection(e2, e1);
+				return error.neg();
 			}
 			return new Vector(0, 0);
 		}
