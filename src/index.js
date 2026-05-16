@@ -763,9 +763,11 @@ function update() {
 			const v1 = nodes[b1].p.sub(p);
 			const v2 = nodes[b2].p.sub(p);
 			const v3 = nodes[b3].p.sub(p);
-			const r2 = v2.sub(v1);
-			const r3 = v3.sub(v1);
-			return (r2.cross(r3) < 0) == (s2 < s3);
+			const c12 = v1.cross(v2);
+			const c23 = v2.cross(v3);
+			const c13 = v1.cross(v3);
+			const o = c13 > 0 ? (c12 > 0 && c23 > 0) : (c12 > 0 || c23 > 0);
+			return o != (s2 < s3);
 		}
 		function getDirection(e1, e2) {
 			const [a1, b1] = orientEdge(e1.a, e1.b);
@@ -774,30 +776,45 @@ function update() {
 			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
 			if (t1 && t2) {
 				if (isDescent(b1, a2)) {
-					nodes[e1.a].neighbors.delete(e2);
-					nodes[e1.b].neighbors.delete(e2);
+					nodes[a1].neighbors.delete(e1);
+					nodes[b1].neighbors.delete(e1);
 					const n = getDirectedNormal(a1, b1, a2);
 					return n;
 				}
 				if (isDescent(b2, a1)) {
-					nodes[e2.a].neighbors.delete(e1);
-					nodes[e2.b].neighbors.delete(e1);
+					nodes[a2].neighbors.delete(e1);
+					nodes[b2].neighbors.delete(e1);
 					const n = getDirectedNormal(a2, b2, b1);
 					return n;
 				}
 				const hca = getHCA(b1, b2);
 				if (hca != null) {
 					const root = dfsTreeParents[hca.p];
-					// if (root == null || isWindingCorrect(hca.p, root, hca.c1, hca.c2)) {
+					if (root == null || isWindingCorrect(hca.p, root, hca.c1, hca.c2)) {
 						const n1 = getDirectedNormal(a1, b1, b2);
 						const n2 = getDirectedNormal(a2, b2, b1);
 						return n2.sub(n1);
-					// }
-					// else {
-						// const n1 = hca.p == a2 ? new Vector(0, 0) : getDirectedNormal(a1, b1, a2);
-						// const n2 = hca.p == a1 ? new Vector(0, 0) : getDirectedNormal(a2, b2, a1);
-						// return [n1, n2];
-					// }
+					}
+					else {
+						let error = new Vector(0, 0);
+						if (a2 != hca.p) {
+							const n = getDirectedNormal(a1, b1, a2);
+							error = error.sub(n);
+						}
+						else {
+							nodes[a2].neighbors.delete(e1);
+							nodes[b2].neighbors.delete(e1);
+						}
+						if (a1 != hca.p) {
+							const n = getDirectedNormal(a2, b2, a1);
+							error = error.add(n);
+						}
+						else {
+							nodes[a1].neighbors.delete(e2);
+							nodes[b1].neighbors.delete(e2);
+						}
+						return error;
+					}
 				}
 			}
 			return new Vector(0, 0);
