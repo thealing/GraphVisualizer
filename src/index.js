@@ -850,8 +850,19 @@ function update() {
 				}
 			}
 			else if (t1) {
+				if (isDescent(a2, a1)) {
+					const root = dfsTreeParents[a2];
+					if (root == null) {
+						return getDirectedNormal(a2, b2, b1);
+					}
+					const child = getChildTowards(a2, a1);
+					const actualSide = getActualSide(a2, root, child, b2);
+					const expectedSide = getExpectedSide(a2, root, child, b2);
+					const difference = expectedSide != actualSide;
+					let n = getDirectedNormal(a2, b2, difference ? a1 : b1);
+					return n;
+				}
 				if (isDescent(b2, a1)) {
-					console.log("way 1");
 					const root = dfsTreeParents[b2];
 					if (root == null) {
 						return getDirectedNormal(a2, b2, b1);
@@ -869,10 +880,12 @@ function update() {
 					return n;
 				}
 				if (isDescent(a1, b2)) {
-					console.log("way 2");
 					const n = getDirectedNormal(a2, b2, a1);
 					return n;
 				}
+				console.log("unrelated " + a1 + " " + a2);
+				const n = getDirectedNormal(a2, b2, b1);
+				return n;
 			}
 			else if (t2) {
 				const error = getDirection(e2, e1);
@@ -924,7 +937,7 @@ function update() {
 			}
 			let error = d.div(l);
 			error = error.mul(nodeDistanceMin - l);
-			error = error.mul(0.01);
+			error = error.mul(0.02);
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
 		for (const u in nodes) {
