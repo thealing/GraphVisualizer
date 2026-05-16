@@ -82,6 +82,7 @@ function onUpdate() {
 	planarOrdering = getPlanarOrdering(nodeCollection, planarEdges);
 	dfsTreeHeights = [];
 	dfsTreeParents = [];
+	dfsTreeSizes = [];
 	dfsEnterTimes = [];
 	dfsLeaveTimes = [];
 	if (planarOrdering) {
@@ -90,6 +91,7 @@ function onUpdate() {
 		function dfsTree(i) {
 			dfsEnterTimes[i] = time;
 			time++;
+			dfsTreeSizes[i] = 1;
 			for (const j of planarOrdering[i]) {
 				if (dfsTreeHeights[j] != null) {
 					continue;
@@ -97,6 +99,7 @@ function onUpdate() {
 				dfsTreeHeights[j] = dfsTreeHeights[i] + 1;
 				dfsTreeParents[j] = i;
 				dfsTree(j);
+				dfsTreeSizes[i] += dfsTreeSizes[j];
 			}
 			dfsLeaveTimes[i] = time;
 			time++;
@@ -784,11 +787,33 @@ function update() {
 					// old resolution
 					// n1 = getDirectedNormal(a1, b1, a2);
 					// n2 = getDirectedNormal(a2, b2, b1);
+					let w1;
+					let w2;
+					if (nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0) {
+						w1 = dfsTreeHeights[a1] - dfsTreeHeights[hca.p];
+					}
+					else {
+						w1 = -dfsTreeSizes[b1];
+					}
+					if (nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0) {
+						w2 = dfsTreeHeights[a2] - dfsTreeHeights[hca.p];
+					}
+					else {
+						w2 = -dfsTreeSizes[b2];
+					}
+					if (Math.sign(w1) == Math.sign(w2)) {
+						if (Math.abs(w1) > Math.abs(w2)) {
+							return n1;
+						}
+						else {
+							return n2;
+						}
+					}
 					let error = new Vector(0, 0);
-					if (a1 != hca.p || nodes[a1].p.sub(nodes[a2].p).dot(n2) < 0) {
+					if (w1 != 0) {
 						error = error.add(n2);
 					}
-					if (a2 != hca.p || nodes[a2].p.sub(nodes[a1].p).dot(n1) > 0) {
+					if (w2 != 0) {
 						error = error.add(n1);
 					}
 					return error;
