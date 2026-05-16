@@ -473,7 +473,7 @@ function update() {
 			nodeCount++;
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
-			nodes[i].neighbors = new Set();
+			nodes[i].neighbors = new Map();
 		}
 		function applyImpulse(i, impulse) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
@@ -682,10 +682,10 @@ function update() {
 				if (lsq < 1e-6) {
 					const entry = [e1, e2, s, t];
 					edgeIntersections.push(entry);
-					nodes[e1.a].neighbors.add(e2);
-					nodes[e1.b].neighbors.add(e2);
-					nodes[e2.a].neighbors.add(e1);
-					nodes[e2.b].neighbors.add(e1);
+					nodes[e1.a].neighbors.set(e2, (nodes[e1.a].neighbors.get(e2) || 0) + 1);
+					nodes[e1.b].neighbors.set(e2, (nodes[e1.b].neighbors.get(e2) || 0) + 1);
+					nodes[e2.a].neighbors.set(e1, (nodes[e2.a].neighbors.get(e1) || 0) + 1);
+					nodes[e2.b].neighbors.set(e1, (nodes[e2.b].neighbors.get(e1) || 0) + 1);
 				}
 				else {
 					const entry = [e1, e2, dx, dy, lsq, s, t];
@@ -704,7 +704,7 @@ function update() {
 		}
 		function isDescent(u, v) {
 			return dfsEnterTimes[u] <= dfsEnterTimes[v] && dfsLeaveTimes[u] >= dfsLeaveTimes[v];
-    }
+		}
 		function orientEdge(a, b) {
 			if (dfsTreeHeights[b] < dfsTreeHeights[a]) {
 				[a, b] = [b, a];
@@ -769,6 +769,10 @@ function update() {
 			const o = c13 > 0 ? (c12 > 0 && c23 > 0) : (c12 > 0 || c23 > 0);
 			return o != (s2 < s3);
 		}
+		function clearDirection(e1, e2) {
+			nodes[e1.a].neighbors.set(e2, nodes[e1.a].neighbors.get(e2) - 1);
+			nodes[e1.b].neighbors.set(e2, nodes[e1.b].neighbors.get(e2) - 1);
+		}
 		function getDirection(e1, e2) {
 			const [a1, b1] = orientEdge(e1.a, e1.b);
 			const [a2, b2] = orientEdge(e2.a, e2.b);
@@ -776,45 +780,46 @@ function update() {
 			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
 			if (t1 && t2) {
 				if (isDescent(b1, a2)) {
-					nodes[a1].neighbors.delete(e1);
-					nodes[b1].neighbors.delete(e1);
+					clearDirection(e1, e2);
 					const n = getDirectedNormal(a1, b1, a2);
 					return n;
 				}
 				if (isDescent(b2, a1)) {
-					nodes[a2].neighbors.delete(e1);
-					nodes[b2].neighbors.delete(e1);
+					clearDirection(e2, e1);
 					const n = getDirectedNormal(a2, b2, b1);
 					return n;
 				}
 				const hca = getHCA(b1, b2);
 				if (hca != null) {
+					const neighbors = planarOrdering[hca.p];
 					const root = dfsTreeParents[hca.p];
-					if (root == null || isWindingCorrect(hca.p, root, hca.c1, hca.c2)) {
-						const n1 = getDirectedNormal(a1, b1, b2);
-						const n2 = getDirectedNormal(a2, b2, b1);
-						return n2.sub(n1);
+					const startIndex = neighbors.indexOf(root);
+					const index1 = neighbors.indexOf(hca.c1);
+					const index2 = neighbors.indexOf(hca.c2);
+					const s1 = (index1 - startIndex + neighbors.length) % neighbors.length;
+					const s2 = (index2 - startIndex + neighbors.length) % neighbors.length;
+					let n1 = getNormal(a1, b1);
+					let n2 = getNormal(a2, b2);
+					if (s1 > s2) {
+						n1 = n1.neg();
 					}
 					else {
-						let error = new Vector(0, 0);
-						if (a2 != hca.p) {
-							const n = getDirectedNormal(a1, b1, a2);
-							error = error.sub(n);
-						}
-						else {
-							nodes[a2].neighbors.delete(e1);
-							nodes[b2].neighbors.delete(e1);
-						}
-						if (a1 != hca.p) {
-							const n = getDirectedNormal(a2, b2, a1);
-							error = error.add(n);
-						}
-						else {
-							nodes[a1].neighbors.delete(e2);
-							nodes[b1].neighbors.delete(e2);
-						}
-						return error;
+						n2 = n2.neg();
 					}
+					let error = new Vector(0, 0);
+					if (a1 == hca.p && nodes[a1].p.sub(nodes[a2].p).dot(n2) < 0) {
+						clearDirection(e1, e2);
+					}
+					else {
+						error = error.add(n2);
+					}
+					if (a2 == hca.p && nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0) {
+						clearDirection(e2, e1);
+					}
+					else {
+						error = error.sub(n1);
+					}
+					return error;
 				}
 			}
 			return new Vector(0, 0);
@@ -849,16 +854,16 @@ function update() {
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
-			if (nodes[e1.a].neighbors.has(e2)) {
+			if (nodes[e1.a].neighbors.get(e2) > 0) {
 				continue;
 			}
-			if (nodes[e1.b].neighbors.has(e2)) {
+			if (nodes[e1.b].neighbors.get(e2) > 0) {
 				continue;
 			}
-			if (nodes[e2.a].neighbors.has(e1)) {
+			if (nodes[e2.a].neighbors.get(e1) > 0) {
 				continue;
 			}
-			if (nodes[e2.b].neighbors.has(e1)) {
+			if (nodes[e2.b].neighbors.get(e1) > 0) {
 				continue;
 			}
 			let error = d.div(l);
