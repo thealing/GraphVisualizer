@@ -801,8 +801,8 @@ function update() {
 						const n2 = getDirectedNormal(a2, b2, b1);
 						return n2.sub(n1);
 					}
-					const expectedSide = getExpectedSide(hca.p, root, hca.c1, hca.c2);
 					const actualSide = getActualSide(hca.p, root, hca.c1, hca.c2);
+					const expectedSide = getExpectedSide(hca.p, root, hca.c1, hca.c2);
 					const difference = expectedSide != actualSide;
 					let n1 = getNormal(a1, b1);
 					let n2 = getNormal(a2, b2);
@@ -810,19 +810,21 @@ function update() {
 						n1 = n1.neg();
 						n2 = n2.neg();
 					}
-					const move1 = nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0;
-					const move2 = nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0;
-					if (move1 != difference) {
+					let move1 = nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0;
+					let move2 = nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0;
+					if (move1 && !difference) {
+						move1 = false;
 						n2 = n2.neg();
 					}
-					if (move2 != difference) {
+					if (move2 && !difference) {
+						move2 = false;
 						n1 = n1.neg();
 					}
 					let error = new Vector(0, 0);
-					if (!difference || a1 != hca.p) {
+					if (!move1 || a1 != hca.p) {
 						error = error.add(n2);
 					}
-					if (!difference || a2 != hca.p) {
+					if (!move2 || a2 != hca.p) {
 						error = error.add(n1);
 					}
 					return error;
