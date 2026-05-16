@@ -473,7 +473,7 @@ function update() {
 			nodeCount++;
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
-			nodes[i].neighbors = new Map();
+			nodes[i].neighbors = new Set();
 		}
 		function applyImpulse(i, impulse) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
@@ -682,10 +682,10 @@ function update() {
 				if (lsq < 1e-6) {
 					const entry = [e1, e2, s, t];
 					edgeIntersections.push(entry);
-					nodes[e1.a].neighbors.set(e2, (nodes[e1.a].neighbors.get(e2) || 0) + 1);
-					nodes[e1.b].neighbors.set(e2, (nodes[e1.b].neighbors.get(e2) || 0) + 1);
-					nodes[e2.a].neighbors.set(e1, (nodes[e2.a].neighbors.get(e1) || 0) + 1);
-					nodes[e2.b].neighbors.set(e1, (nodes[e2.b].neighbors.get(e1) || 0) + 1);
+					// nodes[e1.a].neighbors.add(e2);
+					// nodes[e1.b].neighbors.add(e2);
+					// nodes[e2.a].neighbors.add(e1);
+					// nodes[e2.b].neighbors.add(e1);
 				}
 				else {
 					const entry = [e1, e2, dx, dy, lsq, s, t];
@@ -752,27 +752,6 @@ function update() {
 			}
 		}
 		
-		function isWindingCorrect(a, b1, b2, b3) {
-			const neighbors = planarOrdering[a];
-			const index1 = neighbors.indexOf(b1);
-			const index2 = neighbors.indexOf(b2);
-			const index3 = neighbors.indexOf(b3);
-			const s2 = (index2 - index1 + neighbors.length) % neighbors.length;
-			const s3 = (index3 - index1 + neighbors.length) % neighbors.length;
-			const p = nodes[a].p;
-			const v1 = nodes[b1].p.sub(p);
-			const v2 = nodes[b2].p.sub(p);
-			const v3 = nodes[b3].p.sub(p);
-			const c12 = v1.cross(v2);
-			const c23 = v2.cross(v3);
-			const c13 = v1.cross(v3);
-			const o = c13 > 0 ? (c12 > 0 && c23 > 0) : (c12 > 0 || c23 > 0);
-			return o != (s2 < s3);
-		}
-		function clearDirection(e1, e2) {
-			nodes[e1.a].neighbors.set(e2, nodes[e1.a].neighbors.get(e2) - 1);
-			nodes[e1.b].neighbors.set(e2, nodes[e1.b].neighbors.get(e2) - 1);
-		}
 		function getDirection(e1, e2) {
 			const [a1, b1] = orientEdge(e1.a, e1.b);
 			const [a2, b2] = orientEdge(e2.a, e2.b);
@@ -780,12 +759,10 @@ function update() {
 			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
 			if (t1 && t2) {
 				if (isDescent(b1, a2)) {
-					clearDirection(e1, e2);
 					const n = getDirectedNormal(a1, b1, a2);
 					return n;
 				}
 				if (isDescent(b2, a1)) {
-					clearDirection(e2, e1);
 					const n = getDirectedNormal(a2, b2, b1);
 					return n;
 				}
@@ -800,24 +777,19 @@ function update() {
 					const s2 = (index2 - startIndex + neighbors.length) % neighbors.length;
 					let n1 = getNormal(a1, b1);
 					let n2 = getNormal(a2, b2);
-					if (s1 > s2) {
+					if (s1 < s2) {
 						n1 = n1.neg();
-					}
-					else {
 						n2 = n2.neg();
 					}
+					// old resolution
+					// n1 = getDirectedNormal(a1, b1, a2);
+					// n2 = getDirectedNormal(a2, b2, b1);
 					let error = new Vector(0, 0);
-					if (a1 == hca.p && nodes[a1].p.sub(nodes[a2].p).dot(n2) < 0) {
-						clearDirection(e1, e2);
-					}
-					else {
+					if (a1 != hca.p || nodes[a1].p.sub(nodes[a2].p).dot(n2) < 0) {
 						error = error.add(n2);
 					}
-					if (a2 == hca.p && nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0) {
-						clearDirection(e2, e1);
-					}
-					else {
-						error = error.sub(n1);
+					if (a2 != hca.p || nodes[a2].p.sub(nodes[a1].p).dot(n1) > 0) {
+						error = error.add(n1);
 					}
 					return error;
 				}
@@ -854,20 +826,21 @@ function update() {
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
-			if (nodes[e1.a].neighbors.get(e2) > 0) {
+			if (nodes[e1.a].neighbors.has(e2)) {
 				continue;
 			}
-			if (nodes[e1.b].neighbors.get(e2) > 0) {
+			if (nodes[e1.b].neighbors.has(e2)) {
 				continue;
 			}
-			if (nodes[e2.a].neighbors.get(e1) > 0) {
+			if (nodes[e2.a].neighbors.has(e1)) {
 				continue;
 			}
-			if (nodes[e2.b].neighbors.get(e1) > 0) {
+			if (nodes[e2.b].neighbors.has(e1)) {
 				continue;
 			}
 			let error = d.div(l);
 			error = error.mul(nodeDistanceMin - l);
+			error = error.mul(0.03);
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
 		for (const u in nodes) {
