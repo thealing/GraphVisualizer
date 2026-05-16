@@ -852,9 +852,6 @@ function update() {
 			else if (t1) {
 				if (isDescent(a2, a1)) {
 					const root = dfsTreeParents[a2];
-					if (root == null) {
-						return getDirectedNormal(a2, b2, b1);
-					}
 					const child = getChildTowards(a2, a1);
 					const actualSide = getActualSide(a2, root, child, b2);
 					const expectedSide = getExpectedSide(a2, root, child, b2);
@@ -879,12 +876,13 @@ function update() {
 					}
 					return n;
 				}
-				if (isDescent(a1, b2)) {
-					const n = getDirectedNormal(a2, b2, a1);
-					return n;
-				}
-				console.log("unrelated " + a1 + " " + a2);
-				const n = getDirectedNormal(a2, b2, b1);
+				const root = dfsTreeParents[b2];
+				const child = getChildTowards(b2, a2);
+				const actualSide = getActualSide(b2, root, child, a2);
+				const expectedSide = getExpectedSide(b2, root, child, a2);
+				const difference = expectedSide != actualSide;
+				const tail = isDescent(b1, b2);
+				let n = getDirectedNormal(a2, b2, difference == tail ? b1 : a1);
 				return n;
 			}
 			else if (t2) {
