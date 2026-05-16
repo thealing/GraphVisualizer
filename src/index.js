@@ -754,7 +754,30 @@ function update() {
 					return null;
 			}
 		}
-		
+		function getExpectedSide(a, b1, b2, b3) {
+			const neighbors = planarOrdering[a];
+			const index1 = neighbors.indexOf(b1);
+			const index2 = neighbors.indexOf(b2);
+			const index3 = neighbors.indexOf(b3);
+			const s2 = (index2 - index1 + neighbors.length) % neighbors.length;
+			const s3 = (index3 - index1 + neighbors.length) % neighbors.length;
+			return s2 < s3;
+		}
+		function getActualSide(a, b1, b2, b3) {
+			const p = nodes[a].p;
+			const v1 = nodes[b1].p.sub(p);
+			const v2 = nodes[b2].p.sub(p);
+			const v3 = nodes[b3].p.sub(p);
+			const c12 = v1.cross(v2);
+			const c23 = v2.cross(v3);
+			const c13 = v1.cross(v3);
+			if (c13 > 0) {
+				return c12 <= 0 || c23 <= 0;
+			}
+			else {
+				return c12 <= 0 && c23 <= 0;
+			}
+		}
 		function getDirection(e1, e2) {
 			const [a1, b1] = orientEdge(e1.a, e1.b);
 			const [a2, b2] = orientEdge(e2.a, e2.b);
@@ -773,50 +796,89 @@ function update() {
 				if (hca != null) {
 					const neighbors = planarOrdering[hca.p];
 					const root = dfsTreeParents[hca.p];
-					const startIndex = neighbors.indexOf(root);
-					const index1 = neighbors.indexOf(hca.c1);
-					const index2 = neighbors.indexOf(hca.c2);
-					const s1 = (index1 - startIndex + neighbors.length) % neighbors.length;
-					const s2 = (index2 - startIndex + neighbors.length) % neighbors.length;
+					if (root == null) {
+						const n1 = getDirectedNormal(a1, b1, b2);
+						const n2 = getDirectedNormal(a2, b2, b1);
+						return n2.sub(n1);
+					}
+					let expectedSide = getExpectedSide(hca.p, root, hca.c1, hca.c2);
+					let actualSide = getActualSide(hca.p, root, hca.c1, hca.c2);
+					if (actualSide == expectedSide) {
+						const n1 = getDirectedNormal(a1, b1, b2);
+						const n2 = getDirectedNormal(a2, b2, b1);
+						return n2.sub(n1);
+					}
 					let n1 = getNormal(a1, b1);
 					let n2 = getNormal(a2, b2);
-					if (s1 < s2) {
+					if (expectedSide) {
 						n1 = n1.neg();
 						n2 = n2.neg();
 					}
+					let error = new Vector(0, 0);
+					if (nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0) {
+						if (a1 != hca.p) {
+							error = error.add(n2);
+						}
+					}
+					else {
+						error = error.sub(n2);
+					}
+					if (nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0) {
+						if (a2 != hca.p) {
+							error = error.add(n1);
+						}
+					}
+					else {
+						error = error.sub(n1);
+					}
+					return error;
+					
+					// const startIndex = neighbors.indexOf(root);
+					// const index1 = neighbors.indexOf(hca.c1);
+					// const index2 = neighbors.indexOf(hca.c2);
+					// const s1 = (index1 - startIndex + neighbors.length) % neighbors.length;
+					// const s2 = (index2 - startIndex + neighbors.length) % neighbors.length;
+					// let n1 = getNormal(a1, b1);
+					// let n2 = getNormal(a2, b2);
+					// if (s1 < s2) {
+						// n1 = n1.neg();
+						// n2 = n2.neg();
+					// }
+					
 					// old resolution
 					// n1 = getDirectedNormal(a1, b1, a2);
 					// n2 = getDirectedNormal(a2, b2, b1);
-					let w1;
-					let w2;
-					if (nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0) {
-						w1 = dfsTreeHeights[a1] - dfsTreeHeights[hca.p];
-					}
-					else {
-						w1 = -dfsTreeSizes[b1];
-					}
-					if (nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0) {
-						w2 = dfsTreeHeights[a2] - dfsTreeHeights[hca.p];
-					}
-					else {
-						w2 = -dfsTreeSizes[b2];
-					}
-					if (Math.sign(w1) == Math.sign(w2)) {
-						if (Math.abs(w1) > Math.abs(w2)) {
-							return n1;
-						}
-						else {
-							return n2;
-						}
-					}
-					let error = new Vector(0, 0);
-					if (w1 != 0) {
-						error = error.add(n2);
-					}
-					if (w2 != 0) {
-						error = error.add(n1);
-					}
-					return error;
+					
+					// let w1;
+					// let w2;
+					// if (nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0) {
+						// w1 = dfsTreeHeights[a1] - dfsTreeHeights[hca.p];
+					// }
+					// else {
+						// w1 = -dfsTreeSizes[b1];
+					// }
+					// if (nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0) {
+						// w2 = dfsTreeHeights[a2] - dfsTreeHeights[hca.p];
+					// }
+					// else {
+						// w2 = -dfsTreeSizes[b2];
+					// }
+					// if (Math.sign(w1) == Math.sign(w2)) {
+						// if (Math.abs(w1) > Math.abs(w2)) {
+							// return n1;
+						// }
+						// else {
+							// return n2;
+						// }
+					// }
+					// let error = new Vector(0, 0);
+					// if (w1 != 0) {
+						// error = error.add(n2);
+					// }
+					// if (w2 != 0) {
+						// error = error.add(n1);
+					// }
+					// return error;
 				}
 			}
 			return new Vector(0, 0);
