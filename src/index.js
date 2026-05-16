@@ -801,84 +801,31 @@ function update() {
 						const n2 = getDirectedNormal(a2, b2, b1);
 						return n2.sub(n1);
 					}
-					let expectedSide = getExpectedSide(hca.p, root, hca.c1, hca.c2);
-					let actualSide = getActualSide(hca.p, root, hca.c1, hca.c2);
-					if (actualSide == expectedSide) {
-						const n1 = getDirectedNormal(a1, b1, b2);
-						const n2 = getDirectedNormal(a2, b2, b1);
-						return n2.sub(n1);
-					}
+					const expectedSide = getExpectedSide(hca.p, root, hca.c1, hca.c2);
+					const actualSide = getActualSide(hca.p, root, hca.c1, hca.c2);
+					const difference = expectedSide != actualSide;
 					let n1 = getNormal(a1, b1);
 					let n2 = getNormal(a2, b2);
 					if (expectedSide) {
 						n1 = n1.neg();
 						n2 = n2.neg();
 					}
+					const move1 = nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0;
+					const move2 = nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0;
+					if (move1 != difference) {
+						n2 = n2.neg();
+					}
+					if (move2 != difference) {
+						n1 = n1.neg();
+					}
 					let error = new Vector(0, 0);
-					if (nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0) {
-						if (a1 != hca.p) {
-							error = error.add(n2);
-						}
+					if (!difference || a1 != hca.p) {
+						error = error.add(n2);
 					}
-					else {
-						error = error.sub(n2);
-					}
-					if (nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0) {
-						if (a2 != hca.p) {
-							error = error.add(n1);
-						}
-					}
-					else {
-						error = error.sub(n1);
+					if (!difference || a2 != hca.p) {
+						error = error.add(n1);
 					}
 					return error;
-					
-					// const startIndex = neighbors.indexOf(root);
-					// const index1 = neighbors.indexOf(hca.c1);
-					// const index2 = neighbors.indexOf(hca.c2);
-					// const s1 = (index1 - startIndex + neighbors.length) % neighbors.length;
-					// const s2 = (index2 - startIndex + neighbors.length) % neighbors.length;
-					// let n1 = getNormal(a1, b1);
-					// let n2 = getNormal(a2, b2);
-					// if (s1 < s2) {
-						// n1 = n1.neg();
-						// n2 = n2.neg();
-					// }
-					
-					// old resolution
-					// n1 = getDirectedNormal(a1, b1, a2);
-					// n2 = getDirectedNormal(a2, b2, b1);
-					
-					// let w1;
-					// let w2;
-					// if (nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0) {
-						// w1 = dfsTreeHeights[a1] - dfsTreeHeights[hca.p];
-					// }
-					// else {
-						// w1 = -dfsTreeSizes[b1];
-					// }
-					// if (nodes[a2].p.sub(nodes[a1].p).dot(n1) < 0) {
-						// w2 = dfsTreeHeights[a2] - dfsTreeHeights[hca.p];
-					// }
-					// else {
-						// w2 = -dfsTreeSizes[b2];
-					// }
-					// if (Math.sign(w1) == Math.sign(w2)) {
-						// if (Math.abs(w1) > Math.abs(w2)) {
-							// return n1;
-						// }
-						// else {
-							// return n2;
-						// }
-					// }
-					// let error = new Vector(0, 0);
-					// if (w1 != 0) {
-						// error = error.add(n2);
-					// }
-					// if (w2 != 0) {
-						// error = error.add(n1);
-					// }
-					// return error;
 				}
 			}
 			return new Vector(0, 0);
@@ -927,7 +874,7 @@ function update() {
 			}
 			let error = d.div(l);
 			error = error.mul(nodeDistanceMin - l);
-			error = error.mul(0.03);
+			error = error.mul(0.01);
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
 		for (const u in nodes) {
