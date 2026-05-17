@@ -946,21 +946,17 @@ function update() {
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
-			if (e2.a != e2.b) {
-				if (nodes[e1.a].moving) {
-					continue;
-				}
-				if (nodes[e1.b].moving) {
-					continue;
-				}
+			if (nodes[e1.a].moving) {
+				continue;
 			}
-			if (e1.a != e1.b) {
-				if (nodes[e2.a].moving) {
-					continue;
-				}
-				if (nodes[e2.b].moving) {
-					continue;
-				}
+			if (nodes[e1.b].moving) {
+				continue;
+			}
+			if (nodes[e2.a].moving) {
+				continue;
+			}
+			if (nodes[e2.b].moving) {
+				continue;
 			}
 			let error = d.div(l);
 			error = error.mul(nodeDistanceMin - l);
