@@ -214,7 +214,7 @@ function onRandom() {
 		const usedEdges = edges.filter(e => w.has(e));
 		const otherEdges = edges.filter(e => !w.has(e));
 		edges = usedEdges.concat(otherEdges);
-		return randomInt(usedEdges.length, n * 3);
+		return randomInt(usedEdges.length, n * 2);
 	}
 	const edgeCount = partitionEdges();
 	if (filterEdges) {
@@ -689,10 +689,10 @@ function update() {
 				if (lsq < 1e-6) {
 					const entry = [e1, e2, s, t];
 					edgeIntersections.push(entry);
-					// nodes[e1.a].neighbors.add(e2);
-					// nodes[e1.b].neighbors.add(e2);
-					// nodes[e2.a].neighbors.add(e1);
-					// nodes[e2.b].neighbors.add(e1);
+					nodes[e1.a].neighbors.add(e2);
+					nodes[e1.b].neighbors.add(e2);
+					nodes[e2.a].neighbors.add(e1);
+					nodes[e2.b].neighbors.add(e1);
 				}
 				else {
 					const entry = [e1, e2, dx, dy, lsq, s, t];
@@ -877,6 +877,9 @@ function update() {
 					return n;
 				}
 				const root = dfsTreeParents[b2];
+				if (root == null) {
+					return getDirectedNormal(a2, b2, b1);
+				}
 				const child = getChildTowards(b2, a2);
 				const actualSide = getActualSide(b2, root, child, a2);
 				const expectedSide = getExpectedSide(b2, root, child, a2);
@@ -889,7 +892,10 @@ function update() {
 				const error = getDirection(e2, e1);
 				return error.neg();
 			}
-			return new Vector(0, 0);
+			else {
+				return new Vector(0, 0);
+			}
+			return getNormal(a1, b1);
 		}
 		function applyEdgeImpulse(e1, e2, s, t, error) {
 			const r = error.len();
@@ -935,7 +941,6 @@ function update() {
 			}
 			let error = d.div(l);
 			error = error.mul(nodeDistanceMin - l);
-			error = error.mul(0.02);
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
 		for (const u in nodes) {
