@@ -480,7 +480,7 @@ function update() {
 			nodeCount++;
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
-			nodes[i].neighbors = new Set();
+			nodes[i].moving = false;
 		}
 		function applyImpulse(i, impulse) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
@@ -689,10 +689,10 @@ function update() {
 				if (lsq < 1e-6) {
 					const entry = [e1, e2, s, t];
 					edgeIntersections.push(entry);
-					nodes[e1.a].neighbors.add(e2);
-					nodes[e1.b].neighbors.add(e2);
-					nodes[e2.a].neighbors.add(e1);
-					nodes[e2.b].neighbors.add(e1);
+					// nodes[e1.a].neighbors.add(e2);
+					// nodes[e1.b].neighbors.add(e2);
+					// nodes[e2.a].neighbors.add(e1);
+					// nodes[e2.b].neighbors.add(e1);
 				}
 				else {
 					const entry = [e1, e2, dx, dy, lsq, s, t];
@@ -798,6 +798,10 @@ function update() {
 				return c12 <= 0 && c23 <= 0;
 			}
 		}
+		function setMovingNode(a1, b1, a2, b2, n) {
+			const move1 = nodes[a1].p.sub(nodes[a2].p).dot(n) > 0;
+			nodes[move1 ? a1 : b1].moving = true;
+		}
 		function getDirection(e1, e2) {
 			const [a1, b1] = orientEdge(e1.a, e1.b);
 			const [a2, b2] = orientEdge(e2.a, e2.b);
@@ -805,10 +809,12 @@ function update() {
 			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
 			if (t1 && t2) {
 				if (isDescent(b1, a2)) {
+					nodes[b2].moving = true;
 					const n = getDirectedNormal(a1, b1, a2);
 					return n;
 				}
 				if (isDescent(b2, a1)) {
+					nodes[b1].moving = true;
 					const n = getDirectedNormal(a2, b2, b1);
 					return n;
 				}
@@ -816,6 +822,8 @@ function update() {
 				if (hca != null) {
 					const root = dfsTreeParents[hca.p];
 					if (root == null) {
+						nodes[b1].moving = true;
+						nodes[b2].moving = true;
 						const n1 = getDirectedNormal(a1, b1, b2);
 						const n2 = getDirectedNormal(a2, b2, b1);
 						return n2.sub(n1);
@@ -841,9 +849,11 @@ function update() {
 					}
 					let error = new Vector(0, 0);
 					if (!move1 || a1 != hca.p) {
+						nodes[move1 ? a1 : b1].moving = true;
 						error = error.add(n2);
 					}
 					if (!move2 || a2 != hca.p) {
+						nodes[move2 ? a2 : b2].moving = true;
 						error = error.add(n1);
 					}
 					return error;
@@ -856,12 +866,15 @@ function update() {
 					const actualSide = getActualSide(a2, root, child, b2);
 					const expectedSide = getExpectedSide(a2, root, child, b2);
 					const difference = expectedSide != actualSide;
-					let n = getDirectedNormal(a2, b2, difference ? a1 : b1);
+					const u = difference ? a1 : b1;
+					nodes[u].moving = true;
+					let n = getDirectedNormal(a2, b2, u);
 					return n;
 				}
 				if (isDescent(b2, a1)) {
 					const root = dfsTreeParents[b2];
 					if (root == null) {
+						nodes[b1].moving = true;
 						return getDirectedNormal(a2, b2, b1);
 					}
 					const child = getChildTowards(b2, a1);
@@ -874,10 +887,12 @@ function update() {
 					if (!move1 && !actualSide) {
 						n = n.neg();
 					}
+					setMovingNode(a1, b1, a2, b2, n);
 					return n;
 				}
 				const root = dfsTreeParents[b2];
 				if (root == null) {
+					nodes[b1].moving = true;
 					return getDirectedNormal(a2, b2, b1);
 				}
 				const child = getChildTowards(b2, a2);
@@ -885,7 +900,9 @@ function update() {
 				const expectedSide = getExpectedSide(b2, root, child, a2);
 				const difference = expectedSide != actualSide;
 				const tail = isDescent(b1, b2);
-				let n = getDirectedNormal(a2, b2, difference == tail ? b1 : a1);
+				const u = difference == tail ? b1 : a1;
+				nodes[u].moving = true;
+				let n = getDirectedNormal(a2, b2, u);
 				return n;
 			}
 			else if (t2) {
@@ -895,7 +912,9 @@ function update() {
 			else {
 				return new Vector(0, 0);
 			}
-			return getNormal(a1, b1);
+			const n = getNormal(a2, b2);
+			setMovingNode(a1, b1, a2, b2, n);
+			return n;
 		}
 		function applyEdgeImpulse(e1, e2, s, t, error) {
 			const r = error.len();
@@ -927,17 +946,21 @@ function update() {
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
-			if (nodes[e1.a].neighbors.has(e2)) {
-				continue;
+			if (e2.a != e2.b) {
+				if (nodes[e1.a].moving) {
+					continue;
+				}
+				if (nodes[e1.b].moving) {
+					continue;
+				}
 			}
-			if (nodes[e1.b].neighbors.has(e2)) {
-				continue;
-			}
-			if (nodes[e2.a].neighbors.has(e1)) {
-				continue;
-			}
-			if (nodes[e2.b].neighbors.has(e1)) {
-				continue;
+			if (e1.a != e1.b) {
+				if (nodes[e2.a].moving) {
+					continue;
+				}
+				if (nodes[e2.b].moving) {
+					continue;
+				}
 			}
 			let error = d.div(l);
 			error = error.mul(nodeDistanceMin - l);
