@@ -480,8 +480,8 @@ function update() {
 			nodeCount++;
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
-			nodes[i].moving = false;
-			nodes[i].neighbors = new Set();
+			nodes[i].allowEdges = new Set();
+			nodes[i].blockEdges = new Set();
 		}
 		function applyImpulse(i, impulse) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
@@ -687,13 +687,9 @@ function update() {
 				}
 				const e1 = edgeArray[i];
 				const e2 = edgeArray[j];
-				if (lsq < 1e-6) {
+				if (lsq < 1e-6 && na1 != nb1 && na2 != nb2) {
 					const entry = [e1, e2, s, t];
 					edgeIntersections.push(entry);
-					// nodes[e1.a].neighbors.add(e2);
-					// nodes[e1.b].neighbors.add(e2);
-					// nodes[e2.a].neighbors.add(e1);
-					// nodes[e2.b].neighbors.add(e1);
 				}
 				else {
 					const entry = [e1, e2, dx, dy, lsq, s, t];
@@ -800,9 +796,9 @@ function update() {
 			}
 		}
 		function moveThroughEdge(i, e1, e2) {
-			nodes[i].moving = true;
-			nodes[e2.a].neighbors.add(e1);
-			nodes[e2.b].neighbors.add(e1);
+			nodes[i].allowEdges.add(e2);
+			nodes[e2.a].blockEdges.add(e1);
+			nodes[e2.b].blockEdges.add(e1);
 		}
 		function setMovingNode(e1, e2, n) {
 			const move1 = nodes[e1.a].p.sub(nodes[e2.a].p).dot(n) > 0;
@@ -829,10 +825,10 @@ function update() {
 				if (hca != null) {
 					const root = dfsTreeParents[hca.p];
 					if (root == null) {
-						nodes[b1].moving = true;
-						nodes[b2].moving = true;
-						nodes[a1].neighbors.add(e2);
-						nodes[a2].neighbors.add(e1);
+						nodes[b1].allowEdges.add(e2);
+						nodes[b2].allowEdges.add(e2);
+						nodes[a1].blockEdges.add(e2);
+						nodes[a2].blockEdges.add(e1);
 						const n1 = getDirectedNormal(a1, b1, b2);
 						const n2 = getDirectedNormal(a2, b2, b1);
 						return n2.sub(n1);
@@ -947,9 +943,6 @@ function update() {
 			applyImpulse(e2.b, impulse.mul(t));
 		}
 		for (let [e1, e2, s, t] of edgeIntersections) {
-			if (e1.a == e1.b || e2.a == e2.b) {
-				continue;
-			}
 			let error = getDirection(e1, e2);
 			error = error.mul(nodeDistanceMin);
 			applyEdgeImpulse(e1, e2, s, t, error);
@@ -962,26 +955,26 @@ function update() {
 				canSkip = false;
 			}
 			else if (e1.a == e1.b) {
-				if (nodes[e1.a].neighbors.has(e2)) {
+				if (nodes[e1.a].blockEdges.has(e2) && !nodes[e1.a].allowEdges.has(e2)) {
 					canSkip = false;
 				}
 			}
 			else if (e2.a == e2.b) {
-				if (nodes[e2.a].neighbors.has(e1)) {
+				if (nodes[e2.a].blockEdges.has(e1) && !nodes[e2.a].allowEdges.has(e1)) {
 					canSkip = false;
 				}
 			}
 			if (canSkip) {
-				if (nodes[e1.a].moving) {
+				if (nodes[e1.a].allowEdges.size > 0) {
 					continue;
 				}
-				if (nodes[e1.b].moving) {
+				if (nodes[e1.b].allowEdges.size > 0) {
 					continue;
 				}
-				if (nodes[e2.a].moving) {
+				if (nodes[e2.a].allowEdges.size > 0) {
 					continue;
 				}
-				if (nodes[e2.b].moving) {
+				if (nodes[e2.b].allowEdges.size > 0) {
 					continue;
 				}
 			}
