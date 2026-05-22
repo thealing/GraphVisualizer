@@ -480,7 +480,7 @@ function update() {
 			nodeCount++;
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
-			nodes[i].allowEdges = new Set();
+			nodes[i].allowEdges = new Array();
 			nodes[i].blockEdges = new Set();
 		}
 		function applyImpulse(i, impulse) {
@@ -795,8 +795,13 @@ function update() {
 				return c12 <= 0 && c23 <= 0;
 			}
 		}
+		function isRotationCorrect(center, p1, p2, p3) {
+			const actualSide = getActualSide(center, p1, p2, p3);
+			const expectedSide = getExpectedSide(center, p1, p2, p3);
+			return actualSide == expectedSide;
+		}
 		function moveThroughEdge(i, e1, e2) {
-			nodes[i].allowEdges.add(e2);
+			nodes[i].allowEdges.push(e2);
 			nodes[e2.a].blockEdges.add(e1);
 			nodes[e2.b].blockEdges.add(e1);
 		}
@@ -825,8 +830,8 @@ function update() {
 				if (hca != null) {
 					const root = dfsTreeParents[hca.p];
 					if (root == null) {
-						nodes[b1].allowEdges.add(e2);
-						nodes[b2].allowEdges.add(e2);
+						nodes[b1].allowEdges.push(e2);
+						nodes[b2].allowEdges.push(e1);
 						nodes[a1].blockEdges.add(e2);
 						nodes[a2].blockEdges.add(e1);
 						const n1 = getDirectedNormal(a1, b1, b2);
@@ -907,7 +912,7 @@ function update() {
 				const expectedSide = getExpectedSide(b2, root, child, a2);
 				const difference = expectedSide != actualSide;
 				const tail = isDescent(b1, b2);
-				const node = difference == tail ? a1 : b1;
+				const node = (difference == tail) ? a1 : b1;
 				moveThroughEdge(node, e1, e2);
 				let n = getDirectedNormal(a2, b2, node);
 				return n;
@@ -917,6 +922,84 @@ function update() {
 				return error.neg();
 			}
 			else {
+				if (isDescent(b1, b2)) {
+					const hca = getHCA(a1, a2);
+					const center = hca.p;
+					if (!isDescent(b2, center)) {
+						return new Vector(0, 0);
+					}
+					const d1 = (center == a1) ? b1 : hca.c1;
+					const d2 = (center == a2) ? b2 : hca.c2;
+					const d3 = dfsTreeParents[center];
+					const correctA = isRotationCorrect(center, d1, d2, d3);
+					let correctB = true;
+					if (center != b2) {
+						const p1 = getChildTowards(b2, center);
+						const p2 = dfsTreeParents[b2];
+						correctB = isRotationCorrect(b2, a2, p1, p2);
+					}
+					let correctC = true;
+					const root = dfsTreeParents[b1];
+					if (root != null) {
+						const child = getChildTowards(b1, b2);
+						correctC = isRotationCorrect(b1, root, child, a1);
+					}
+					// if (typeof debugCorrectSet == "undefined") {
+						// debugCorrectSet = new Set();
+					// }
+					// console.log(correctA + " " + correctB + " " + correctC);
+					if (correctC) {
+						if (!correctA) {
+							moveThroughEdge(a2, e2, e1);
+							return getDirectedNormal(a1, b1, b2);
+						}
+						if (!correctB) {
+							moveThroughEdge(a1, e1, e2);
+							return getDirectedNormal(a2, b2, a1);
+						}
+					}
+					else {
+						moveThroughEdge(b2, e2, e1);
+						return getDirectedNormal(a1, b1, a2);
+					}
+				}
+				else if (isDescent(b2, b1)) {
+					const error = getDirection(e2, e1);
+					return error.neg();
+				}
+				return new Vector(0, 0);
+				
+				// ...
+				if (isDescent(a1, a2) && isDescent(b1, b2) && isDescent(b2, a1)) {
+					let wrongA;
+					let wrongB;
+					let wrongC;
+					{
+						const p1 = dfsTreeParents[a1];
+						const p2 = getChildTowards(a1, a2);
+						wrongA = isRotationCorrect(a1, b1, p1, p2);
+					}
+					{
+						const p1 = dfsTreeParents[b2];
+						const p2 = getChildTowards(b2, a1);
+						wrongA = isRotationCorrect(b2, a2, p1, p2);
+					}
+					{
+						const root = dfsTreeParents[b1];
+						if (root == null) {
+							wrongC = false;
+						}
+						else {
+							const c = getChildTowards(b1, b2);
+							wrongC = isRotationCorrect(b1, a1, root, c);
+						}
+					}
+					console.log(wrongA, wrongB, wrongC);
+				}
+				else if (isDescent(a2, a1) && isDescent(b2, b1) && isDescent(b1, a2)) {
+					const error = getDirection(e2, e1);
+					return error.neg();
+				}
 				return new Vector(0, 0);
 			}
 			const n = getNormal(a2, b2);
@@ -947,37 +1030,53 @@ function update() {
 			error = error.mul(nodeDistanceMin);
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
+		for (const e of undirectedEdges) {
+			for (const j of planarOrdering[e.a]) {
+				nodes[j].blockEdges.add(e);
+			}
+			for (const j of planarOrdering[e.b]) {
+				nodes[j].blockEdges.add(e);
+			}
+		}
+		for (const i in nodes) {
+			for (const e of nodes[i].allowEdges) {
+				nodes[i].blockEdges.delete(e);
+			}
+		}
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
-			let canSkip = true;
-			if (e1.a == e1.b && e2.a == e2.b) {
-				canSkip = false;
-			}
-			else if (e1.a == e1.b) {
-				if (nodes[e1.a].blockEdges.has(e2) && !nodes[e1.a].allowEdges.has(e2)) {
-					canSkip = false;
-				}
-			}
-			else if (e2.a == e2.b) {
-				if (nodes[e2.a].blockEdges.has(e1) && !nodes[e2.a].allowEdges.has(e1)) {
-					canSkip = false;
-				}
-			}
-			if (canSkip) {
-				if (nodes[e1.a].allowEdges.size > 0) {
-					continue;
-				}
-				if (nodes[e1.b].allowEdges.size > 0) {
-					continue;
-				}
-				if (nodes[e2.a].allowEdges.size > 0) {
-					continue;
-				}
-				if (nodes[e2.b].allowEdges.size > 0) {
-					continue;
-				}
-			}
+			// let canSkip = true;
+			const point1 = e1.a == e1.b;
+			const point2 = e2.a == e2.b;
+			// if (point1 && point2) {
+				// if (nodes[e1.a].allowEdges.length > 0) {
+					// continue;
+				// }
+				// if (nodes[e2.a].allowEdges.length > 0) {
+					// continue;
+				// }
+			// }
+			// else {
+				// if (canSkip) {
+					if (!point2) {
+						if (nodes[e1.a].allowEdges.length > 0) {
+							continue;
+						}
+						if (nodes[e1.b].allowEdges.length > 0) {
+							continue;
+						}
+					}
+					if (!point1) {
+						if (nodes[e2.a].allowEdges.length > 0) {
+							continue;
+						}
+						if (nodes[e2.b].allowEdges.length > 0) {
+							continue;
+						}
+					}
+				// }
+			// }
 			let error = d.div(l);
 			error = error.mul(nodeDistanceMin - l);
 			applyEdgeImpulse(e1, e2, s, t, error);
