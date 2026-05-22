@@ -907,12 +907,18 @@ function update() {
 					moveThroughEdge(b1, e1, e2);
 					return getDirectedNormal(a2, b2, b1);
 				}
-				const child = getChildTowards(b2, a2);
-				const actualSide = getActualSide(b2, root, child, a2);
-				const expectedSide = getExpectedSide(b2, root, child, a2);
-				const difference = expectedSide != actualSide;
-				const tail = isDescent(b1, b2);
-				const node = (difference == tail) ? a1 : b1;
+				const ancestorEdge = isDescent(b1, b2);
+				let node;
+				if (ancestorEdge) {
+					node = a1;
+				}
+				else {
+					const child = getChildTowards(b2, a2);
+					const actualSide = getActualSide(b2, root, child, a2);
+					const expectedSide = getExpectedSide(b2, root, child, a2);
+					const difference = expectedSide != actualSide;
+					node = difference ? a1 : b1;
+				}
 				moveThroughEdge(node, e1, e2);
 				let n = getDirectedNormal(a2, b2, node);
 				return n;
