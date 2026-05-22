@@ -214,7 +214,7 @@ function onRandom() {
 		const usedEdges = edges.filter(e => w.has(e));
 		const otherEdges = edges.filter(e => !w.has(e));
 		edges = usedEdges.concat(otherEdges);
-		return randomInt(usedEdges.length, n * 2);
+		return randomInt(usedEdges.length, Math.ceil(n * 2.5));
 	}
 	const edgeCount = partitionEdges();
 	if (filterEdges) {
@@ -481,6 +481,7 @@ function update() {
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
 			nodes[i].moving = false;
+			nodes[i].neighbors = new Set();
 		}
 		function applyImpulse(i, impulse) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
@@ -798,9 +799,15 @@ function update() {
 				return c12 <= 0 && c23 <= 0;
 			}
 		}
-		function setMovingNode(a1, b1, a2, b2, n) {
-			const move1 = nodes[a1].p.sub(nodes[a2].p).dot(n) > 0;
-			nodes[move1 ? a1 : b1].moving = true;
+		function moveThroughEdge(i, e1, e2) {
+			nodes[i].moving = true;
+			nodes[e2.a].neighbors.add(e1);
+			nodes[e2.b].neighbors.add(e1);
+		}
+		function setMovingNode(e1, e2, n) {
+			const move1 = nodes[e1.a].p.sub(nodes[e2.a].p).dot(n) > 0;
+			const node = move1 ? e1.a : e1.b;
+			moveThroughEdge(node, e1, e2);
 		}
 		function getDirection(e1, e2) {
 			const [a1, b1] = orientEdge(e1.a, e1.b);
@@ -809,12 +816,12 @@ function update() {
 			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
 			if (t1 && t2) {
 				if (isDescent(b1, a2)) {
-					nodes[b2].moving = true;
+					moveThroughEdge(b2, e2, e1);
 					const n = getDirectedNormal(a1, b1, a2);
 					return n;
 				}
 				if (isDescent(b2, a1)) {
-					nodes[b1].moving = true;
+					moveThroughEdge(b1, e1, e2);
 					const n = getDirectedNormal(a2, b2, b1);
 					return n;
 				}
@@ -824,6 +831,8 @@ function update() {
 					if (root == null) {
 						nodes[b1].moving = true;
 						nodes[b2].moving = true;
+						nodes[a1].neighbors.add(e2);
+						nodes[a2].neighbors.add(e1);
 						const n1 = getDirectedNormal(a1, b1, b2);
 						const n2 = getDirectedNormal(a2, b2, b1);
 						return n2.sub(n1);
@@ -849,11 +858,13 @@ function update() {
 					}
 					let error = new Vector(0, 0);
 					if (!move1 || a1 != hca.p) {
-						nodes[move1 ? a1 : b1].moving = true;
+						const node = move1 ? a1 : b1;
+						moveThroughEdge(node, e1, e2);
 						error = error.add(n2);
 					}
 					if (!move2 || a2 != hca.p) {
-						nodes[move2 ? a2 : b2].moving = true;
+						const node = move2 ? a2 : b2;
+						moveThroughEdge(node, e2, e1);
 						error = error.add(n1);
 					}
 					return error;
@@ -866,15 +877,15 @@ function update() {
 					const actualSide = getActualSide(a2, root, child, b2);
 					const expectedSide = getExpectedSide(a2, root, child, b2);
 					const difference = expectedSide != actualSide;
-					const u = difference ? a1 : b1;
-					nodes[u].moving = true;
-					let n = getDirectedNormal(a2, b2, u);
+					const node = difference ? a1 : b1;
+					moveThroughEdge(node, e1, e2);
+					let n = getDirectedNormal(a2, b2, node);
 					return n;
 				}
 				if (isDescent(b2, a1)) {
 					const root = dfsTreeParents[b2];
 					if (root == null) {
-						nodes[b1].moving = true;
+						moveThroughEdge(b1, e1, e2);
 						return getDirectedNormal(a2, b2, b1);
 					}
 					const child = getChildTowards(b2, a1);
@@ -887,12 +898,12 @@ function update() {
 					if (!move1 && !actualSide) {
 						n = n.neg();
 					}
-					setMovingNode(a1, b1, a2, b2, n);
+					setMovingNode(e1, e2, n);
 					return n;
 				}
 				const root = dfsTreeParents[b2];
 				if (root == null) {
-					nodes[b1].moving = true;
+					moveThroughEdge(b1, e1, e2);
 					return getDirectedNormal(a2, b2, b1);
 				}
 				const child = getChildTowards(b2, a2);
@@ -900,9 +911,9 @@ function update() {
 				const expectedSide = getExpectedSide(b2, root, child, a2);
 				const difference = expectedSide != actualSide;
 				const tail = isDescent(b1, b2);
-				const u = difference == tail ? b1 : a1;
-				nodes[u].moving = true;
-				let n = getDirectedNormal(a2, b2, u);
+				const node = difference == tail ? a1 : b1;
+				moveThroughEdge(node, e1, e2);
+				let n = getDirectedNormal(a2, b2, node);
 				return n;
 			}
 			else if (t2) {
@@ -913,7 +924,7 @@ function update() {
 				return new Vector(0, 0);
 			}
 			const n = getNormal(a2, b2);
-			setMovingNode(a1, b1, a2, b2, n);
+			setMovingNode(e1, e2, n);
 			return n;
 		}
 		function applyEdgeImpulse(e1, e2, s, t, error) {
@@ -946,17 +957,33 @@ function update() {
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
-			if (nodes[e1.a].moving) {
-				continue;
+			let canSkip = true;
+			if (e1.a == e1.b && e2.a == e2.b) {
+				canSkip = false;
 			}
-			if (nodes[e1.b].moving) {
-				continue;
+			else if (e1.a == e1.b) {
+				if (nodes[e1.a].neighbors.has(e2)) {
+					canSkip = false;
+				}
 			}
-			if (nodes[e2.a].moving) {
-				continue;
+			else if (e2.a == e2.b) {
+				if (nodes[e2.a].neighbors.has(e1)) {
+					canSkip = false;
+				}
 			}
-			if (nodes[e2.b].moving) {
-				continue;
+			if (canSkip) {
+				if (nodes[e1.a].moving) {
+					continue;
+				}
+				if (nodes[e1.b].moving) {
+					continue;
+				}
+				if (nodes[e2.a].moving) {
+					continue;
+				}
+				if (nodes[e2.b].moving) {
+					continue;
+				}
 			}
 			let error = d.div(l);
 			error = error.mul(nodeDistanceMin - l);
