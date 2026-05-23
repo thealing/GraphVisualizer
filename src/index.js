@@ -347,6 +347,7 @@ function init() {
 	const displayStyle = window.getComputedStyle(displaySvg);
 	displayFont = displayStyle.fontFamily;
 	canvasFontProperty = "";
+	untanglerForce = 1000;
 	onApply();
 	onUpdate();
 	update();
@@ -923,7 +924,6 @@ function update() {
 				return error.neg();
 			}
 			else {
-				return new Vector(0, 0); // SKIP
 				if (isDescent(b1, b2)) {
 					const hca = getHCA(a1, a2);
 					const center = hca.p;
@@ -946,10 +946,6 @@ function update() {
 						const child = getChildTowards(b1, b2);
 						correctC = isRotationCorrect(b1, root, child, a1);
 					}
-					// if (typeof debugCorrectSet == "undefined") {
-						// debugCorrectSet = new Set();
-					// }
-					// console.log(correctA + " " + correctB + " " + correctC);
 					if (correctC) {
 						if (!correctA) {
 							moveThroughEdge(a2, e2, e1);
@@ -970,39 +966,6 @@ function update() {
 					return error.neg();
 				}
 				return new Vector(0, 0);
-				
-				// ...
-				if (isDescent(a1, a2) && isDescent(b1, b2) && isDescent(b2, a1)) {
-					let wrongA;
-					let wrongB;
-					let wrongC;
-					{
-						const p1 = dfsTreeParents[a1];
-						const p2 = getChildTowards(a1, a2);
-						wrongA = isRotationCorrect(a1, b1, p1, p2);
-					}
-					{
-						const p1 = dfsTreeParents[b2];
-						const p2 = getChildTowards(b2, a1);
-						wrongA = isRotationCorrect(b2, a2, p1, p2);
-					}
-					{
-						const root = dfsTreeParents[b1];
-						if (root == null) {
-							wrongC = false;
-						}
-						else {
-							const c = getChildTowards(b1, b2);
-							wrongC = isRotationCorrect(b1, a1, root, c);
-						}
-					}
-					console.log(wrongA, wrongB, wrongC);
-				}
-				else if (isDescent(a2, a1) && isDescent(b2, b1) && isDescent(b1, a2)) {
-					const error = getDirection(e2, e1);
-					return error.neg();
-				}
-				return new Vector(0, 0);
 			}
 			const n = getNormal(a2, b2);
 			setMovingNode(e1, e2, n);
@@ -1017,7 +980,7 @@ function update() {
 			const v1 = nodes[e1.a].v.mul(1 - s).add(nodes[e1.b].v.mul(s));
 			const v2 = nodes[e2.a].v.mul(1 - t).add(nodes[e2.b].v.mul(t));
 			const dv = v2.sub(v1);
-			const da = r * 0.6 - n.dot(dv);
+			const da = r - n.dot(dv);
 			if (da <= 0) {
 				return;
 			}
@@ -1032,50 +995,13 @@ function update() {
 			if (error.x != 0 || error.y != 0) {
 				collisionSet.add(e1.a + "-" + e1.b + " x " + e2.a + "-" + e2.b + " : " + error.x.toFixed(2) + "," + error.y.toFixed(2));
 			}
-			error = error.mul(50);
+			error = error.mul(5000);
 			applyEdgeImpulse(e1, e2, s, t, error);
-		}
-		for (const e of undirectedEdges) {
-			for (const j of planarOrdering[e.a]) {
-				nodes[j].blockEdges.add(e);
-			}
-			for (const j of planarOrdering[e.b]) {
-				nodes[j].blockEdges.add(e);
-			}
-		}
-		for (const i in nodes) {
-			for (const e of nodes[i].allowEdges) {
-				nodes[i].blockEdges.delete(e);
-			}
 		}
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
-			let reduction = 0;
-			let blocked = false;
-			if (e1.a == e1.b) {
-				if (nodes[e1.a].blockEdges.has(e2)) {
-					blocked = true;
-				}
-			}
-			if (e2.a == e2.b) {
-				if (nodes[e2.a].blockEdges.has(e1)) {
-					blocked = true;
-				}
-			}
-			reduction += nodes[e1.a].allowEdges.size;
-			reduction += nodes[e1.b].allowEdges.size;
-			reduction += nodes[e2.b].allowEdges.size;
-			reduction += nodes[e2.b].allowEdges.size;
-			let error;
-			if (reduction > 0) {
-				const multiplier = blocked ? 0.5 : 0.1;
-				error = d.mul(multiplier / (l * reduction));
-			}
-			else {
-				error = d.div(l);
-			}
-			error = error.mul(nodeDistanceMin - l);
+			const error = d.mul(nodeDistanceMin / l - 1);
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
 		for (const u in nodes) {
