@@ -214,7 +214,7 @@ function onRandom() {
 		const usedEdges = edges.filter(e => w.has(e));
 		const otherEdges = edges.filter(e => !w.has(e));
 		edges = usedEdges.concat(otherEdges);
-		return randomInt(usedEdges.length, Math.ceil(n * 2.5));
+		return randomInt(usedEdges.length, Math.ceil(n * 2.3));
 	}
 	const edgeCount = partitionEdges();
 	if (filterEdges) {
@@ -480,7 +480,7 @@ function update() {
 			nodeCount++;
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
-			nodes[i].allowEdges = new Array();
+			nodes[i].allowEdges = new Set();
 			nodes[i].blockEdges = new Set();
 		}
 		function applyImpulse(i, impulse) {
@@ -502,42 +502,16 @@ function update() {
 				}
 			}
 		}
-		function findGroups() {
-			const v = new Set();
-			function dfs(g, i) {
-				g.push(i);
-				for (const j of unorderedNeighbors[i]) {
-					if (v.has(j)) {
-						continue;
-					}
-					v.add(j);
-					dfs(g, j);
-				}
-			}
-			const groups = [];
-			for (const s in nodes) {
-				const i = Number(s);
-				if (v.has(i)) {
-					continue;
-				}
-				v.add(i);
-				const group = [];
-				dfs(group, i);
-				groups.push(group);
-			}
-			return groups;
-		}
-		const groups = findGroups();
-		for (const group of groups) {
+		{
 			const center = new Vector(0, 0);
-			for (const i of group) {
+			for (const i in nodes) {
 				center.x += nodes[i].p.x;
 				center.y += nodes[i].p.y;
 			}
-			center.x /= group.length;
-			center.y /= group.length;
+			center.x /= nodeCount;
+			center.y /= nodeCount;
 			const displayCenter = new Vector(displayWidth / 2, displayHeight / 2);
-			for (const i of group) {
+			for (const i in nodes) {
 				const dir = displayCenter.sub(center);
 				const distance = dir.len();
 				const width2 = displayWidth * displayWidth;
@@ -550,13 +524,26 @@ function update() {
 					const l = Math.abs(error[k]);
 					if (l > 1e-3) {
 						const n = e.div(l);
-						const tv = l * 0.1 * Math.sqrt(group.length / nodeCount);
+						const tv = l * 0.1;
 						const rv = n.dot(nodes[i].v);
 						const impulse = n.mul(tv - rv);
 						applyImpulse(i, impulse);
 					}
 				}
 			}
+		}
+		for (const i in nodes) {
+			const displayCenter = new Vector(displayWidth / 2, displayHeight / 2);
+			const dir = displayCenter.sub(nodes[i].p)
+			const width2 = displayWidth * displayWidth;
+			const height2 = displayHeight * displayHeight;
+			const denom = width2 + height2;
+			const error = new Vector(dir.x * height2 / denom, dir.y * width2 / denom);
+			const n = dir.norm();
+			const tv = error.mul(0.05);
+			const rv = n.mul(n.dot(nodes[i].v));
+			const impulse = tv.sub(rv);
+			applyImpulse(i, impulse);
 		}
 		for (const e of undirectedEdges) {
 			const a = e.a;
@@ -566,11 +553,13 @@ function update() {
 			if (l > 1e-3) {
 				const n = d.div(l);
 				const error = n.mul(springDistance - l);
-				const tv = error.mul(springDistance > l ? 0.2 : 0.06);
-				const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
-				const impulse = tv.sub(rv).mul(0.5);
-				applyImpulse(a, impulse.neg());
-				applyImpulse(b, impulse);
+				if (springDistance > l) {
+					const tv = error.mul(0.2);
+					const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
+					const impulse = tv.sub(rv).mul(0.5);
+					applyImpulse(a, impulse.neg());
+					applyImpulse(b, impulse);
+				}
 			}
 		}
 		const edgePoints = new Float64Array(edgeArray.length * 4);
@@ -744,6 +733,7 @@ function update() {
 			}
 			return [a, b];
 		}
+		collisionSet = new Set();
 		
 		{ // SLOP
 			function isAncestor(u, v) {
@@ -801,7 +791,7 @@ function update() {
 			return actualSide == expectedSide;
 		}
 		function moveThroughEdge(i, e1, e2) {
-			nodes[i].allowEdges.push(e2);
+			nodes[i].allowEdges.add(e2);
 			nodes[e2.a].blockEdges.add(e1);
 			nodes[e2.b].blockEdges.add(e1);
 		}
@@ -830,8 +820,8 @@ function update() {
 				if (hca != null) {
 					const root = dfsTreeParents[hca.p];
 					if (root == null) {
-						nodes[b1].allowEdges.push(e2);
-						nodes[b2].allowEdges.push(e1);
+						nodes[b1].allowEdges.add(e2);
+						nodes[b2].allowEdges.add(e1);
 						nodes[a1].blockEdges.add(e2);
 						nodes[a2].blockEdges.add(e1);
 						const n1 = getDirectedNormal(a1, b1, b2);
@@ -872,6 +862,7 @@ function update() {
 				}
 			}
 			else if (t1) {
+				return new Vector(0, 0); // SKIP
 				if (isDescent(a2, a1)) {
 					const root = dfsTreeParents[a2];
 					const child = getChildTowards(a2, a1);
@@ -889,17 +880,21 @@ function update() {
 						moveThroughEdge(b1, e1, e2);
 						return getDirectedNormal(a2, b2, b1);
 					}
-					const child = getChildTowards(b2, a1);
-					const actualSide = getActualSide(b2, root, child, a2);
-					const expectedSide = getExpectedSide(b2, root, child, a2);
-					const difference = expectedSide != actualSide;
-					const n2 = getNormal(a2, b2);
-					const move1 = nodes[a1].p.sub(nodes[a2].p).dot(n2) > 0;
-					let n = getDirectedNormal(a2, b2, difference ? a1 : b1);
-					if (!move1 && !actualSide) {
-						n = n.neg();
+					let outside;
+					{
+						const hca = getHCA(a1, a2);
+						const root = dfsTreeParents[hca.p];
+						outside = getActualSide(hca.p, hca.c1, hca.c2, root);
 					}
-					setMovingNode(e1, e2, n);
+					if (outside) {
+						moveThroughEdge(b1, e1, e2);
+						return getDirectedNormal(a2, b2, b1);
+					}
+					const child = getChildTowards(b2, a1);
+					const difference = isRotationCorrect(b2, root, child, a2);
+					const node = difference ? a1 : b1;
+					moveThroughEdge(node, e1, e2);
+					let n = getDirectedNormal(a2, b2, node);
 					return n;
 				}
 				const root = dfsTreeParents[b2];
@@ -928,6 +923,7 @@ function update() {
 				return error.neg();
 			}
 			else {
+				return new Vector(0, 0); // SKIP
 				if (isDescent(b1, b2)) {
 					const hca = getHCA(a1, a2);
 					const center = hca.p;
@@ -1033,7 +1029,10 @@ function update() {
 		}
 		for (let [e1, e2, s, t] of edgeIntersections) {
 			let error = getDirection(e1, e2);
-			error = error.mul(nodeDistanceMin);
+			if (error.x != 0 || error.y != 0) {
+				collisionSet.add(e1.a + "-" + e1.b + " x " + e2.a + "-" + e2.b + " : " + error.x.toFixed(2) + "," + error.y.toFixed(2));
+			}
+			error = error.mul(50);
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
 		for (const e of undirectedEdges) {
@@ -1052,38 +1051,30 @@ function update() {
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
-			// let canSkip = true;
-			const point1 = e1.a == e1.b;
-			const point2 = e2.a == e2.b;
-			// if (point1 && point2) {
-				// if (nodes[e1.a].allowEdges.length > 0) {
-					// continue;
-				// }
-				// if (nodes[e2.a].allowEdges.length > 0) {
-					// continue;
-				// }
-			// }
-			// else {
-				// if (canSkip) {
-					if (!point2) {
-						if (nodes[e1.a].allowEdges.length > 0) {
-							continue;
-						}
-						if (nodes[e1.b].allowEdges.length > 0) {
-							continue;
-						}
-					}
-					if (!point1) {
-						if (nodes[e2.a].allowEdges.length > 0) {
-							continue;
-						}
-						if (nodes[e2.b].allowEdges.length > 0) {
-							continue;
-						}
-					}
-				// }
-			// }
-			let error = d.div(l);
+			let reduction = 0;
+			let blocked = false;
+			if (e1.a == e1.b) {
+				if (nodes[e1.a].blockEdges.has(e2)) {
+					blocked = true;
+				}
+			}
+			if (e2.a == e2.b) {
+				if (nodes[e2.a].blockEdges.has(e1)) {
+					blocked = true;
+				}
+			}
+			reduction += nodes[e1.a].allowEdges.size;
+			reduction += nodes[e1.b].allowEdges.size;
+			reduction += nodes[e2.b].allowEdges.size;
+			reduction += nodes[e2.b].allowEdges.size;
+			let error;
+			if (reduction > 0) {
+				const multiplier = blocked ? 0.5 : 0.1;
+				error = d.mul(multiplier / (l * reduction));
+			}
+			else {
+				error = d.div(l);
+			}
 			error = error.mul(nodeDistanceMin - l);
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
