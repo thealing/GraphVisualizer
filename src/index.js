@@ -214,11 +214,27 @@ function onRandom() {
 		const usedEdges = edges.filter(e => w.has(e));
 		const otherEdges = edges.filter(e => !w.has(e));
 		edges = usedEdges.concat(otherEdges);
-		return randomInt(usedEdges.length, Math.ceil(n * 2.3));
+		return randomInt(usedEdges.length, Math.ceil(n * 3));
 	}
 	const edgeCount = partitionEdges();
+	const degreeLimit = 6;
 	if (filterEdges) {
-		edges.length = Math.min(edges.length, edgeCount);
+		const filteredEdges = [];
+		const nodeDegrees = [];
+		for (let i = 0; i < n; i++) {
+			nodeDegrees[i] = 0;
+		}
+		for (const e of edges) {
+			if (filteredEdges.length == edgeCount) {
+				break;
+			}
+			if (nodeDegrees[e[0]] < degreeLimit && nodeDegrees[e[1]] < degreeLimit) {
+				nodeDegrees[e[0]]++;
+				nodeDegrees[e[1]]++;
+				filteredEdges.push(e);
+			}
+		}
+		edges = filteredEdges;
 	}
 	const directedEdges = [];
 	function genLine(e) {
