@@ -365,13 +365,6 @@ function init() {
 	const displayStyle = window.getComputedStyle(displaySvg);
 	displayFont = displayStyle.fontFamily;
 	canvasFontProperty = "";
-	velocityLimitFactor = 0.8;
-	forces = {};
-	forces.centering = 0.1;
-	forces.edgePush = 0.2;
-	forces.edgePull = 0.03;
-	forces.nodeProximity = 0.9;
-	forces.edgeProximity = 0.5;
 	onApply();
 	onUpdate();
 	update();
@@ -495,11 +488,9 @@ function update() {
 	const subSteps = Math.ceil(dt);
 	const stepSize = dt / subSteps;
 	const edgeArray = Array.from(undirectedEdges);
-	const nodeEdgeMaps = [];
 	for (const i in nodes) {
 		const e = new Edge(i, i, 0, true);
 		edgeArray.push(e);
-		nodeEdgeMaps[i] = e;
 	}
 	for (let s = 0; s < subSteps; s++) {
 		let nodeCount = 0;
@@ -507,8 +498,7 @@ function update() {
 			nodeCount++;
 			nodes[i].a = new Vector();
 			nodes[i].ac = 0;
-			nodes[i].allowEdges = new Set();
-			nodes[i].blockEdges = new Set();
+			nodes[i].moving = false;
 		}
 		function applyImpulse(i, impulse) {
 			if (!nodes[i].dragging && !nodes[i].fixed) {
@@ -523,7 +513,7 @@ function update() {
 			}
 			for (const i in nodes) {
 				const l = nodes[i].v.len();
-				const limit = nodeRadius * velocityLimitFactor;
+				const limit = nodeRadius * 0.7;
 				if (l > limit) {
 					nodes[i].v = nodes[i].v.mul(limit / l);
 				}
@@ -577,7 +567,7 @@ function update() {
 					const l = Math.abs(error[k]);
 					if (l > 1e-3) {
 						const n = e.div(l);
-						const tv = l * forces.centering * Math.sqrt(group.length / nodeCount);
+						const tv = l * 0.1 * Math.sqrt(group.length / nodeCount);
 						const rv = n.dot(nodes[i].v);
 						const impulse = n.mul(tv - rv);
 						applyImpulse(i, impulse);
@@ -594,7 +584,7 @@ function update() {
 				const n = d.div(l);
 				const len = Math.max(springDistance - l, -springDistance);
 				const error = n.mul(len);
-				const tv = error.mul(l < springDistance ? forces.edgePush : forces.edgePull);
+				const tv = error.mul(l < springDistance ? 0.2 : 0.04);
 				const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
 				const impulse = tv.sub(rv).mul(0.5);
 				applyImpulse(a, impulse.neg());
@@ -715,9 +705,11 @@ function update() {
 				}
 				const e1 = edgeArray[i];
 				const e2 = edgeArray[j];
-				if (lsq < 1e-6 && na1 != nb1 && na2 != nb2) {
-					const entry = [e1, e2, s, t];
-					edgeIntersections.push(entry);
+				if (lsq < 1e-6) {
+					if (na1 != nb1 && na2 != nb2) {
+						const entry = [e1, e2, s, t];
+						edgeIntersections.push(entry);
+					}
 				}
 				else {
 					const entry = [e1, e2, dx, dy, lsq, s, t];
@@ -829,20 +821,10 @@ function update() {
 			const expectedSide = getExpectedSide(center, p1, p2, p3);
 			return actualSide == expectedSide;
 		}
-		function moveNodeThroughEdge(i, e) {
-			nodes[i].allowEdges.add(e);
-			nodes[i].allowEdges.add(nodeEdgeMaps[e.a]);
-			nodes[i].allowEdges.add(nodeEdgeMaps[e.b]);
-		}
-		function moveThroughEdge(i, e1, e2) {
-			moveNodeThroughEdge(i, e2);
-			nodes[e2.a].blockEdges.add(e1);
-			nodes[e2.b].blockEdges.add(e1);
-		}
 		function setMovingNode(e1, e2, n) {
 			const move1 = nodes[e1.a].p.sub(nodes[e2.a].p).dot(n) > 0;
 			const node = move1 ? e1.a : e1.b;
-			moveThroughEdge(node, e1, e2);
+			nodes[node].moving = true;
 		}
 		function getDirection(e1, e2) {
 			const [a1, b1] = orientEdge(e1.a, e1.b);
@@ -851,23 +833,22 @@ function update() {
 			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
 			if (t1 && t2) {
 				if (isDescent(b1, a2)) {
-					moveThroughEdge(b2, e2, e1);
+					nodes[b2].moving = true;
 					const n = getDirectedNormal(a1, b1, a2);
 					return n;
 				}
 				if (isDescent(b2, a1)) {
-					moveThroughEdge(b1, e1, e2);
+					nodes[b1].moving = true;
 					const n = getDirectedNormal(a2, b2, b1);
 					return n;
 				}
 				const hca = getHCA(b1, b2);
 				if (hca != null) {
+					return new Vector(0, 0); // SKIP
 					const root = dfsTreeParents[hca.p];
 					if (root == null) {
-						moveNodeThroughEdge(b1, e2);
-						moveNodeThroughEdge(b2, e1);
-						nodes[a1].blockEdges.add(e2);
-						nodes[a2].blockEdges.add(e1);
+						nodes[b1].moving = true;
+						nodes[b2].moving = true;
 						const n1 = getDirectedNormal(a1, b1, b2);
 						const n2 = getDirectedNormal(a2, b2, b1);
 						return n2.sub(n1);
@@ -894,18 +875,19 @@ function update() {
 					let error = new Vector(0, 0);
 					if (!move1 || a1 != hca.p) {
 						const node = move1 ? a1 : b1;
-						moveThroughEdge(node, e1, e2);
+						nodes[node].moving = true;
 						error = error.add(n2);
 					}
 					if (!move2 || a2 != hca.p) {
 						const node = move2 ? a2 : b2;
-						moveThroughEdge(node, e2, e1);
+						nodes[node].moving = true;
 						error = error.add(n1);
 					}
 					return error;
 				}
 			}
 			else if (t1) {
+				return new Vector(0, 0); // SKIP
 				if (isDescent(a2, a1)) {
 					const root = dfsTreeParents[a2];
 					const child = getChildTowards(a2, a1);
@@ -913,14 +895,14 @@ function update() {
 					const expectedSide = getExpectedSide(a2, root, child, b2);
 					const difference = expectedSide != actualSide;
 					const node = difference ? a1 : b1;
-					moveThroughEdge(node, e1, e2);
+					nodes[node].moving = true;
 					let n = getDirectedNormal(a2, b2, node);
 					return n;
 				}
 				if (isDescent(b2, a1)) {
 					const root = dfsTreeParents[b2];
 					if (root == null) {
-						moveThroughEdge(b1, e1, e2);
+						nodes[b1].moving = true;
 						return getDirectedNormal(a2, b2, b1);
 					}
 					let outside;
@@ -930,19 +912,19 @@ function update() {
 						outside = getActualSide(hca.p, hca.c1, hca.c2, root);
 					}
 					if (outside) {
-						moveThroughEdge(b1, e1, e2);
+						nodes[b1].moving = true;
 						return getDirectedNormal(a2, b2, b1);
 					}
 					const child = getChildTowards(b2, a1);
 					const difference = isRotationCorrect(b2, root, child, a2);
 					const node = difference ? a1 : b1;
-					moveThroughEdge(node, e1, e2);
+					nodes[node].moving = true;
 					let n = getDirectedNormal(a2, b2, node);
 					return n;
 				}
 				const root = dfsTreeParents[b2];
 				if (root == null) {
-					moveThroughEdge(b1, e1, e2);
+					nodes[b1].moving = true;
 					return getDirectedNormal(a2, b2, b1);
 				}
 				const ancestorEdge = isDescent(b1, b2);
@@ -957,7 +939,7 @@ function update() {
 					const difference = expectedSide != actualSide;
 					node = difference ? a1 : b1;
 				}
-				moveThroughEdge(node, e1, e2);
+				nodes[node].moving = true;
 				let n = getDirectedNormal(a2, b2, node);
 				return n;
 			}
@@ -966,6 +948,7 @@ function update() {
 				return error.neg();
 			}
 			else {
+				return new Vector(0, 0); // SKIP
 				if (isDescent(b1, b2)) {
 					const hca = getHCA(a1, a2);
 					const center = hca.p;
@@ -990,16 +973,16 @@ function update() {
 					}
 					if (correctC) {
 						if (!correctA) {
-							moveThroughEdge(a2, e2, e1);
+							nodes[a2].moving = true;
 							return getDirectedNormal(a1, b1, b2);
 						}
 						if (!correctB) {
-							moveThroughEdge(a1, e1, e2);
+							nodes[a1].moving = true;
 							return getDirectedNormal(a2, b2, a1);
 						}
 					}
 					else {
-						moveThroughEdge(b2, e2, e1);
+						nodes[b2].moving = true;
 						return getDirectedNormal(a1, b1, a2);
 					}
 				}
@@ -1022,7 +1005,7 @@ function update() {
 			const v1 = nodes[e1.a].v.mul(1 - s).add(nodes[e1.b].v.mul(s));
 			const v2 = nodes[e2.a].v.mul(1 - t).add(nodes[e2.b].v.mul(t));
 			const dv = v2.sub(v1);
-			const da = r - n.dot(dv);
+			const da = r * 0.6 - n.dot(dv);
 			if (da <= 0) {
 				return;
 			}
@@ -1045,77 +1028,22 @@ function update() {
 			console.log(collisionSet);
 		}
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
-			if (nodes[e2.a].allowEdges.has(e1)) {
+			if (nodes[e1.a].moving) {
 				continue;
 			}
-			if (nodes[e2.b].allowEdges.has(e1)) {
+			if (nodes[e1.b].moving) {
 				continue;
 			}
-			if (nodes[e1.a].allowEdges.has(e2)) {
+			if (nodes[e2.a].moving) {
 				continue;
 			}
-			if (nodes[e1.b].allowEdges.has(e2)) {
+			if (nodes[e2.b].moving) {
 				continue;
 			}
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
 			let error = d.mul(nodeDistanceMin / l - 1);
-			if (e1.a == e1.b && e2.a == e2.b) {
-				error = error.mul(forces.nodeProximity);
-			}
-			else {
-				error = error.mul(forces.edgeProximity);
-			}
 			applyEdgeImpulse(e1, e2, s, t, error);
-		}
-		for (const u in nodes) {
-			break; //!!!!
-			const nb = adj[u];
-			const n = nb.length;
-			if (n < 3) {
-				continue;
-			}
-			const a = new Array(n);
-			for (let i = 0; i < n; i++) {
-				a[i] = i;
-			}
-			a.sort((i, j) => {
-				const p0 = nodes[u].p;
-				const p1 = nodes[nb[i]].p;
-				const p2 = nodes[nb[j]].p;
-				const angle1 = Math.atan2(p1.y - p0.y, p1.x - p0.x);
-				const angle2 = Math.atan2(p2.y - p0.y, p2.x - p0.x);
-				return angle1 - angle2;
-			});
-			for (let i = 0; i < n; i++) {
-				let j = (i + 1) % n;
-				const currentIndex = a[i];
-				const nextIndex = a[j];
-				const expectedNext = (currentIndex + j - i + n) % n;
-				if (nextIndex != expectedNext) {
-					const force = 5 * -Math.sign(currentIndex - nextIndex);
-					const v1 = nb[currentIndex];
-					const v2 = nb[nextIndex];
-					const dx1 = nodes[v1].p.x - nodes[u].p.x;
-					const dy1 = nodes[v1].p.y - nodes[u].p.y;
-					const dx2 = nodes[v2].p.x - nodes[u].p.x;
-					const dy2 = nodes[v2].p.y - nodes[u].p.y;
-					const d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) + 1e-6;
-					const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) + 1e-6;
-					const tx1 = -dy1 / d1, ty1 = dx1 / d1;
-					const tx2 = -dy2 / d2, ty2 = dx2 / d2;
-					const rv1 = ((nodes[v1].v.x - nodes[u].v.x) * tx1 + (nodes[v1].v.y - nodes[u].v.y) * ty1) / d1;
-					const rv2 = ((nodes[v2].v.x - nodes[u].v.x) * tx2 + (nodes[v2].v.y - nodes[u].v.y) * ty2) / d2;
-					const rv = rv2 - rv1;
-					const da = (force / n) - rv; 
-					const l = da * 0.5;
-					const imp1 = new Vector(tx1 * -l * d1, ty1 * -l * d1);
-					const imp2 = new Vector(tx2 * l * d2, ty2 * l * d2);
-					applyImpulse(v1, imp1);
-					applyImpulse(v2, imp2);
-					applyImpulse(u, imp1.add(imp2).neg());
-				}
-			}
 		}
 		finalizeImpulses();
 		for (const i in nodes) {

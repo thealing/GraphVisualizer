@@ -27,42 +27,193 @@
 				</div>
 				<div class="separator"></div>
 				<textarea id="edge-list-edit" placeholder="Edge list goes here">
-1 11 9
-2 9 6
-2 13 6
-3 1 4
-3 2 5
-3 8 5
-3 12 5
-4 14 9
-4 16 1
-5 2 4
-5 8 4
-5 12 6
-5 17 1
-6 7 1
-7 1 7
-8 3 3
-8 5 9
-8 12 6
-9 2 4
-9 4 9
-9 5 4
-9 16 8
-9 18 8
-10 3 6
-11 15 9
-11 20 5
-12 3 3
-12 5 7
-12 8 8
-14 4 2
-15 1 1
-16 9 1
-17 5 6
-18 4 8
-18 5 4
-19 8 3
+1 7 8
+1 47 6
+1 48 3
+2 1 1
+2 53 7
+2 81 5
+3 8 6
+3 18 8
+3 85 9
+4 5 6
+4 9 7
+4 16 2
+4 34 2
+4 78 2
+5 58 8
+5 61 5
+5 77 5
+6 3 7
+6 8 3
+6 50 1
+6 70 6
+7 48 1
+7 64 1
+7 83 7
+8 11 2
+9 41 8
+9 49 6
+9 75 3
+10 32 3
+10 54 2
+10 92 5
+11 94 8
+12 10 6
+12 43 3
+12 63 5
+13 74 7
+14 22 5
+14 30 6
+15 66 5
+15 69 2
+16 18 4
+16 58 4
+16 76 8
+17 19 4
+17 44 8
+17 78 5
+18 100 2
+19 17 2
+19 44 2
+19 67 4
+20 8 2
+20 14 9
+20 45 2
+21 24 3
+21 41 5
+22 11 1
+22 14 8
+22 30 1
+23 21 2
+23 24 4
+23 75 8
+24 21 1
+25 2 6
+25 61 5
+25 62 8
+25 99 2
+26 15 7
+26 42 1
+26 81 8
+26 95 6
+27 13 3
+28 1 4
+29 3 3
+30 14 5
+31 29 2
+31 82 2
+32 38 1
+32 73 6
+33 26 2
+33 81 2
+34 4 6
+34 19 5
+34 88 5
+35 21 4
+36 29 6
+36 31 1
+36 82 8
+37 29 2
+37 89 5
+38 86 3
+39 23 5
+39 24 4
+39 75 9
+40 87 7
+40 97 3
+41 35 2
+42 15 7
+42 33 9
+42 91 9
+43 63 6
+44 17 6
+44 19 7
+44 98 7
+45 20 4
+45 22 7
+46 43 3
+47 28 7
+48 64 8
+49 53 5
+49 71 5
+50 6 8
+50 51 6
+50 57 5
+51 13 6
+51 50 1
+52 11 7
+52 20 7
+52 96 5
+53 49 9
+54 85 4
+55 14 8
+56 29 4
+56 37 9
+56 89 5
+57 50 5
+58 16 4
+58 76 2
+59 21 9
+59 23 2
+59 24 6
+60 32 5
+60 38 4
+60 86 5
+60 90 5
+61 99 7
+62 25 5
+63 12 5
+64 48 7
+66 69 4
+67 17 4
+67 19 2
+67 44 7
+67 98 8
+68 18 7
+68 100 4
+69 15 1
+70 57 5
+71 9 6
+72 11 9
+72 52 5
+74 8 9
+74 13 9
+74 27 3
+76 16 1
+77 68 9
+80 6 1
+80 57 3
+81 2 1
+81 26 2
+81 33 1
+82 31 4
+82 36 3
+84 16 7
+84 18 9
+85 10 9
+85 54 5
+86 32 3
+86 38 7
+86 60 1
+87 12 2
+87 97 2
+88 19 1
+90 2 5
+90 60 8
+91 95 4
+93 12 2
+93 40 8
+93 87 3
+94 14 5
+95 15 2
+95 91 3
+96 20 2
+96 52 9
+97 87 2
+98 17 1
+98 44 4
+99 5 5
 
 
 
@@ -72,7 +223,7 @@
 				<div class="separator"></div>
 				<div class="input-container">
 					<label id="speed-label">Simulation Speed</label>
-					<input id="speed-input" type="number" value="1" step="0.1" min="0" max="100" />
+					<input id="speed-input" type="number" value="10" step="0.1" min="0" max="100" />
 					<label id="manual-label">Manual Mode</label>
 					<input id="manual-input" type="checkbox" />
 				</div>
@@ -80,13 +231,13 @@
 				<label id="example-label">Random Graph</label>
 				<div class="input-container">
 					<label id="example-count-label">Node Count</label>
-					<input id="example-count-input" type="number" value="30" min="1" max="1000" />
+					<input id="example-count-input" type="number" value="100" min="1" max="1000" />
 					<label id="degree-limit-label">Degree Limit</label>
 					<input id="degree-limit-input" type="number" value="5" min="1" max="10" />
 					<label id="example-type-label">Graph Type</label>
 					<select id="example-type-input">
 						<option value="any">Any</option>
-						<option value="planar">Planar</option>
+						<option value="planar" selected>Planar</option>
 						<option value="tree">Tree</option>
 					</select>
 				</div>
