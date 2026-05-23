@@ -844,7 +844,6 @@ function update() {
 				}
 				const hca = getHCA(b1, b2);
 				if (hca != null) {
-					return new Vector(0, 0); // SKIP
 					const root = dfsTreeParents[hca.p];
 					if (root == null) {
 						nodes[b1].moving = true;
@@ -887,7 +886,6 @@ function update() {
 				}
 			}
 			else if (t1) {
-				return new Vector(0, 0); // SKIP
 				if (isDescent(a2, a1)) {
 					const root = dfsTreeParents[a2];
 					const child = getChildTowards(a2, a1);
@@ -948,12 +946,12 @@ function update() {
 				return error.neg();
 			}
 			else {
-				return new Vector(0, 0); // SKIP
 				if (isDescent(b1, b2)) {
 					const hca = getHCA(a1, a2);
 					const center = hca.p;
 					if (!isDescent(b2, center)) {
-						return new Vector(0, 0);
+						nodes[a1].moving = true;
+						return getDirectedNormal(a2, b2, a1);
 					}
 					const d1 = (center == a1) ? b1 : hca.c1;
 					const d2 = (center == a2) ? b2 : hca.c2;
