@@ -365,7 +365,13 @@ function init() {
 	const displayStyle = window.getComputedStyle(displaySvg);
 	displayFont = displayStyle.fontFamily;
 	canvasFontProperty = "";
-	untanglerForce = 1000;
+	forces = {};
+	forces.nodeCentering = 0.01;
+	forces.graphCentering = 0.08;
+	forces.edgeSpring = 0.7;
+	forces.nodeProximity = 0.9;
+	forces.edgeProximity = 0.3;
+	forces.untanglement = 999;
 	onApply();
 	onUpdate();
 	update();
@@ -521,6 +527,17 @@ function update() {
 				}
 			}
 		}
+		for (const i in nodes) {
+			const displayCenter = new Vector(displayWidth / 2, displayHeight / 2);
+			const dir = displayCenter.sub(nodes[i].p);
+			const denom = displayWidth + displayHeight;
+			const error = new Vector(dir.x * displayHeight / denom, dir.y * displayWidth / denom);
+			const n = dir.norm();
+			const tv = error.mul(forces.nodeCentering);
+			const rv = n.mul(n.dot(nodes[i].v));
+			const impulse = tv.sub(rv);
+			applyImpulse(i, impulse);
+		}
 		{
 			const center = new Vector(0, 0);
 			for (const i in nodes) {
@@ -543,26 +560,13 @@ function update() {
 					const l = Math.abs(error[k]);
 					if (l > 1e-3) {
 						const n = e.div(l);
-						const tv = l * 0.1;
+						const tv = l * forces.graphCentering;
 						const rv = n.dot(nodes[i].v);
 						const impulse = n.mul(tv - rv);
 						applyImpulse(i, impulse);
 					}
 				}
 			}
-		}
-		for (const i in nodes) {
-			const displayCenter = new Vector(displayWidth / 2, displayHeight / 2);
-			const dir = displayCenter.sub(nodes[i].p)
-			const width2 = displayWidth * displayWidth;
-			const height2 = displayHeight * displayHeight;
-			const denom = width2 + height2;
-			const error = new Vector(dir.x * height2 / denom, dir.y * width2 / denom);
-			const n = dir.norm();
-			const tv = error.mul(0.05);
-			const rv = n.mul(n.dot(nodes[i].v));
-			const impulse = tv.sub(rv);
-			applyImpulse(i, impulse);
 		}
 		for (const e of undirectedEdges) {
 			const a = e.a;
@@ -573,7 +577,7 @@ function update() {
 				const n = d.div(l);
 				const error = n.mul(springDistance - l);
 				if (springDistance > l) {
-					const tv = error.mul(0.2);
+					const tv = error.mul(forces.edgeSpring);
 					const rv = n.mul(n.dot(nodes[b].v.sub(nodes[a].v)));
 					const impulse = tv.sub(rv).mul(0.5);
 					applyImpulse(a, impulse.neg());
@@ -825,6 +829,7 @@ function update() {
 			const t1 = dfsTreeHeights[a1] + 1 == dfsTreeHeights[b1];
 			const t2 = dfsTreeHeights[a2] + 1 == dfsTreeHeights[b2];
 			if (t1 && t2) {
+				return new Vector(0, 0); // SKIP
 				if (isDescent(b1, a2)) {
 					moveThroughEdge(b2, e2, e1);
 					const n = getDirectedNormal(a1, b1, a2);
@@ -942,6 +947,7 @@ function update() {
 				return error.neg();
 			}
 			else {
+				return new Vector(0, 0); // SKIP
 				if (isDescent(b1, b2)) {
 					const hca = getHCA(a1, a2);
 					const center = hca.p;
@@ -1013,13 +1019,19 @@ function update() {
 			if (error.x != 0 || error.y != 0) {
 				collisionSet.add(e1.a + "-" + e1.b + " x " + e2.a + "-" + e2.b + " : " + error.x.toFixed(2) + "," + error.y.toFixed(2));
 			}
-			error = error.mul(5000);
+			error = error.mul(forces.untanglement);
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
 		for (let [e1, e2, dx, dy, lsq, s, t] of edgeContacts) {
 			const d = new Vector(dx, dy);
 			const l = Math.sqrt(lsq);
-			const error = d.mul(nodeDistanceMin / l - 1);
+			let error = d.mul(nodeDistanceMin / l - 1);
+			if (e1.a == e1.b && e2.a == e2.b) {
+				error = error.mul(forces.nodeProximity);
+			}
+			else {
+				error = error.mul(forces.edgeProximity);
+			}
 			applyEdgeImpulse(e1, e2, s, t, error);
 		}
 		for (const u in nodes) {
