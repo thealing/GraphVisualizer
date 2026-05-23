@@ -16,6 +16,8 @@ const edgeListEdit = document.getElementById("edge-list-edit");
 
 const displaySvg = document.getElementById("display-svg");
 
+const degreeLimitInput = document.getElementById("degree-limit-input");
+
 const exampleCountInput = document.getElementById("example-count-input");
 
 const exampleTypeInput = document.getElementById("example-type-input");
@@ -189,6 +191,7 @@ function onRandom() {
 		const j = randomInt(i, edges.length - 1);
 		[edges[i], edges[j]] = [edges[j], edges[i]];
 	}
+	const degreeLimit = parseInt(degreeLimitInput.value) || 1;
 	function partitionEdges() {
 		const edgeMap = [];
 		for (let i = 0; i < n; i++) {
@@ -214,10 +217,9 @@ function onRandom() {
 		const usedEdges = edges.filter(e => w.has(e));
 		const otherEdges = edges.filter(e => !w.has(e));
 		edges = usedEdges.concat(otherEdges);
-		return randomInt(usedEdges.length, Math.ceil(n * 3));
+		return randomInt(usedEdges.length, Math.floor(n * degreeLimit / 2));
 	}
 	const edgeCount = partitionEdges();
-	const degreeLimit = 6;
 	if (filterEdges) {
 		const filteredEdges = [];
 		const nodeDegrees = [];
